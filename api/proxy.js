@@ -36,14 +36,11 @@ export default async function handler(req, res) {
         body: JSON.stringify(event),
       });
       const calData = await calRes.json();
-
-      // Send booking notification email to Jeff
       await sendEmailViaResend(
         'jwlegacyrealty@gmail.com',
         `New Booking — ${event.summary}`,
         `A new session has been booked!\n\n${event.description}\n\nDate/Time: ${event.start.dateTime}\n\nThis has been added to your Google Calendar automatically.`
       );
-
       return res.status(200).json(calData);
     }
 
@@ -55,6 +52,8 @@ export default async function handler(req, res) {
       const server = process.env.MAILCHIMP_SERVER;
       const audienceId = process.env.MAILCHIMP_AUDIENCE_ID;
       const apiKey = process.env.MAILCHIMP_API_KEY;
+
+      console.log('Mailchimp attempt:', { server, audienceId, email, tags });
 
       const mcRes = await fetch(
         `https://${server}.api.mailchimp.com/3.0/lists/${audienceId}/members`,
@@ -78,7 +77,7 @@ export default async function handler(req, res) {
       );
       const mcData = await mcRes.json();
       console.log('Mailchimp response:', JSON.stringify(mcData));
-      return res.status(200).json({ success: true });
+      return res.status(200).json({ success: true, mailchimp: mcData });
     }
 
     // ── Email: Send via Resend ────────────────────────────────────────────
