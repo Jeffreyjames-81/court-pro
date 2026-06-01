@@ -13,8 +13,6 @@ const COACH = {
 const PRIVATE_SERVICES = [
   { id: "30min", name: "30 Min Lesson", duration: 30, price: 35, desc: "Quick focused session — perfect for working on one specific skill." },
   { id: "60min", name: "60 Min Lesson", duration: 60, price: 70, desc: "Full one-on-one instruction tailored to your game." },
-  { id: "match", name: "Match Play", duration: 90, price: 105, desc: "Supervised competitive play with coaching feedback." },
-  { id: "tourney", name: "Tournament Prep", duration: 90, price: 105, desc: "Strategy, mental game, and match-ready drills." },
 ];
 
 const CLINICS = [
