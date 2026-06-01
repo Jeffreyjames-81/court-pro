@@ -8,14 +8,14 @@ const COACH = {
   color: "#1d4ed8",
   bio: "USPTA certified tennis pro with 15 years of teaching experience. Rated 4.5 and passionate about competitive development — Jeff has coached multiple students to ITF Gold achievements.",
   rating: 5.0,
-  reviews: 47,
-  services: [
-    { id: "a", name: "Private Lesson",  duration: 60,  price: 70,  desc: "One-on-one instruction tailored to your game." },
-    { id: "b", name: "Group Clinic",    duration: 90,  price: 105, desc: "Small group format — max 4 players." },
-    { id: "c", name: "Match Play",      duration: 90,  price: 105, desc: "Supervised competitive play with coaching feedback." },
-    { id: "d", name: "Tournament Prep", duration: 90,  price: 105, desc: "Strategy, mental game, and match-ready drills." },
-  ]
 };
+
+const PRIVATE_SERVICES = [
+  { id: "30min", name: "30 Min Lesson", duration: 30, price: 35, desc: "Quick focused session — perfect for working on one specific skill." },
+  { id: "60min", name: "60 Min Lesson", duration: 60, price: 70, desc: "Full one-on-one instruction tailored to your game." },
+  { id: "match", name: "Match Play", duration: 90, price: 105, desc: "Supervised competitive play with coaching feedback." },
+  { id: "tourney", name: "Tournament Prep", duration: 90, price: 105, desc: "Strategy, mental game, and match-ready drills." },
+];
 
 const CLINICS = [
   {
@@ -23,7 +23,7 @@ const CLINICS = [
     name: "Cardio Tennis Clinic",
     day: "Thursdays",
     time: "7:00 PM",
-    desc: "High-energy cardio tennis with music! Mixed men & women, all levels welcome.",
+    desc: "High-energy cardio tennis with music! Mixed men & women, all levels welcome. Sign up and Jeff will confirm your spot.",
     level: "All levels",
     inviteOnly: false,
     emoji: "🎵"
@@ -195,17 +195,14 @@ function WelcomeView({ onEnter }) {
             <Stars r={5}/>
           </div>
         </div>
-
         <p style={{fontSize:13,color:"#475569",textAlign:"center",marginBottom:20,lineHeight:1.5}}>
           Tell us a little about yourself to get started!
         </p>
-
         <FormField id="name" label="Full Name" placeholder="Jane Smith" value={f.name} onChange={handleChange} error={errs.name}/>
         <FormField id="email" label="Email" placeholder="jane@example.com" type="email" value={f.email} onChange={handleChange} error={errs.email}/>
         <FormField id="phone" label="Phone" placeholder="(352) 555-0100" type="tel" value={f.phone} onChange={handleChange} error={errs.phone}/>
         <FormSelect id="level" label="Skill Level" options={LEVELS} value={f.level} onChange={handleChange} error={errs.level}/>
         <FormSelect id="goal" label="What brings you here?" options={GOALS} value={f.goal} onChange={handleChange} error={errs.goal}/>
-
         <div style={{marginTop:20}}>
           <PrimaryBtn full onClick={submit}>Let's Play →</PrimaryBtn>
         </div>
@@ -217,17 +214,17 @@ function WelcomeView({ onEnter }) {
 // ── Home ───────────────────────────────────────────────────────────────────
 function HomeView({ onBook, onClinics, onDashboard, lead }) {
   const [sel, setSel] = useState(null);
+  const [tab, setTab] = useState("private");
+
   return (
     <div>
       <div style={{background:"linear-gradient(135deg,#1e3a5f 0%,#1d4ed8 100%)",padding:"36px 24px 32px",color:"#fff",position:"relative"}}>
         <button onClick={onDashboard} style={{position:"absolute",top:16,right:16,background:"rgba(255,255,255,.15)",border:"none",color:"#fff",padding:"5px 14px",borderRadius:20,fontSize:12,fontWeight:600,cursor:"pointer"}}>Admin →</button>
         <div style={{fontSize:42,marginBottom:10}}>🎾</div>
         <h1 style={{fontSize:26,fontWeight:800,margin:"0 0 4px"}}>Jeff Williams Tennis</h1>
-        <p style={{opacity:.8,margin:"0 0 6px",fontSize:14}}>Ocala, FL · Book a session</p>
-        {lead?.name && <p style={{opacity:.9,margin:"0 0 10px",fontSize:13}}>Welcome back, {lead.name.split(" ")[0]}! 👋</p>}
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <Stars r={COACH.rating}/>
-        </div>
+        <p style={{opacity:.8,margin:"0 0 6px",fontSize:14}}>Ocala, FL · Effective coaching</p>
+        {lead?.name && <p style={{opacity:.9,margin:"0 0 10px",fontSize:13}}>Welcome, {lead.name.split(" ")[0]}! 👋</p>}
+        <Stars r={COACH.rating}/>
       </div>
 
       <div style={{padding:"20px 20px 0",maxWidth:580,margin:"0 auto"}}>
@@ -241,72 +238,147 @@ function HomeView({ onBook, onClinics, onDashboard, lead }) {
           ))}
         </div>
 
-        <div style={{background:"#f0fdf4",border:"1px solid #86efac",borderRadius:16,padding:"14px 16px",marginBottom:20,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div>
-            <div style={{fontWeight:700,fontSize:14,color:"#15803d"}}>🎵 Cardio Tennis Clinic</div>
-            <div style={{fontSize:12,color:"#16a34a"}}>Thursdays 7pm · Open to all · Music!</div>
-          </div>
-          <button onClick={onClinics} style={{background:"#16a34a",color:"#fff",border:"none",borderRadius:10,padding:"8px 14px",fontSize:12,fontWeight:700,cursor:"pointer"}}>View →</button>
+        {/* Tabs */}
+        <div style={{display:"flex",gap:8,marginBottom:20}}>
+          {[["private","🎾 Private Sessions"],["clinics","👥 Clinics"]].map(([t,label])=>(
+            <button key={t} onClick={()=>{setTab(t);setSel(null);}} style={{
+              flex:1, padding:"12px 8px", borderRadius:14, fontWeight:700, fontSize:14, cursor:"pointer",
+              background: tab===t?"#1d4ed8":"#fff",
+              color: tab===t?"#fff":"#64748b",
+              border: tab===t?"none":"2px solid #e2e8f0"
+            }}>{label}</button>
+          ))}
         </div>
 
-        <h2 style={{fontSize:17,fontWeight:700,color:"#0f172a",marginBottom:12}}>Book a Session</h2>
-        {COACH.services.map(s => (
-          <div key={s.id} onClick={()=>setSel(s)} style={{
-            borderRadius:16, border:`2px solid ${sel?.id===s.id?"#1d4ed8":"#e2e8f0"}`,
-            background: sel?.id===s.id?"#eff6ff":"#fff",
-            padding:"14px 16px", marginBottom:10, cursor:"pointer",
-            display:"flex", justifyContent:"space-between", alignItems:"center"
-          }}>
-            <div>
-              <div style={{fontWeight:600,fontSize:15,color:"#0f172a"}}>{s.name}</div>
-              <div style={{fontSize:12,color:"#64748b",marginTop:3}}>{s.desc}</div>
-              <div style={{fontSize:12,color:"#94a3b8",marginTop:2}}>{s.duration} min</div>
+        {/* Private Sessions */}
+        {tab === "private" && (
+          <>
+            <h2 style={{fontSize:15,fontWeight:700,color:"#0f172a",marginBottom:4}}>Book a Private Session</h2>
+            <p style={{fontSize:13,color:"#64748b",marginBottom:14}}>30 min and 60 min sessions available — pick what works for you.</p>
+            {PRIVATE_SERVICES.map(s => (
+              <div key={s.id} onClick={()=>setSel(s)} style={{
+                borderRadius:16, border:`2px solid ${sel?.id===s.id?"#1d4ed8":"#e2e8f0"}`,
+                background: sel?.id===s.id?"#eff6ff":"#fff",
+                padding:"14px 16px", marginBottom:10, cursor:"pointer",
+                display:"flex", justifyContent:"space-between", alignItems:"center"
+              }}>
+                <div>
+                  <div style={{fontWeight:600,fontSize:15,color:"#0f172a"}}>{s.name}</div>
+                  <div style={{fontSize:12,color:"#64748b",marginTop:3}}>{s.desc}</div>
+                  <div style={{fontSize:12,color:"#94a3b8",marginTop:2}}>{s.duration} min</div>
+                </div>
+                <div style={{textAlign:"right",flexShrink:0,marginLeft:12}}>
+                  <div style={{fontSize:20,fontWeight:800,color:"#0f172a"}}>${s.price}</div>
+                  {sel?.id===s.id && <div style={{fontSize:11,color:"#1d4ed8",fontWeight:600}}>Selected ✓</div>}
+                </div>
+              </div>
+            ))}
+            <div style={{marginTop:20,paddingBottom:32}}>
+              <PrimaryBtn full disabled={!sel} onClick={()=>sel&&onBook(sel)}>
+                {sel ? `Book ${sel.name} · $${sel.price}` : "Select a session to continue"}
+              </PrimaryBtn>
             </div>
-            <div style={{textAlign:"right",flexShrink:0,marginLeft:12}}>
-              <div style={{fontSize:20,fontWeight:800,color:"#0f172a"}}>${s.price}</div>
-              {sel?.id===s.id && <div style={{fontSize:11,color:"#1d4ed8",fontWeight:600}}>Selected ✓</div>}
-            </div>
+          </>
+        )}
+
+        {/* Clinics */}
+        {tab === "clinics" && (
+          <div style={{paddingBottom:32}}>
+            <h2 style={{fontSize:15,fontWeight:700,color:"#0f172a",marginBottom:4}}>Join a Clinic</h2>
+            <p style={{fontSize:13,color:"#64748b",marginBottom:14}}>Group sessions for all levels — open and invite-only options available.</p>
+            {CLINICS.map(c => (
+              <div key={c.id} style={{background:"#fff",border:`2px solid ${c.inviteOnly?"#e2e8f0":"#86efac"}`,borderRadius:20,padding:"18px",marginBottom:14}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+                  <div>
+                    <div style={{fontWeight:700,fontSize:16,color:"#0f172a"}}>{c.emoji} {c.name}</div>
+                    <div style={{fontSize:13,color:"#64748b",marginTop:2}}>{c.day} · {c.time}</div>
+                    <div style={{fontSize:12,color:"#94a3b8",marginTop:2}}>Level: {c.level}</div>
+                  </div>
+                  {c.inviteOnly
+                    ? <span style={{background:"#fef3c7",color:"#92400e",fontSize:11,fontWeight:700,padding:"4px 10px",borderRadius:20,whiteSpace:"nowrap"}}>Invite Only</span>
+                    : <span style={{background:"#dcfce7",color:"#15803d",fontSize:11,fontWeight:700,padding:"4px 10px",borderRadius:20,whiteSpace:"nowrap"}}>Open</span>
+                  }
+                </div>
+                <p style={{fontSize:13,color:"#475569",lineHeight:1.5,margin:"0 0 12px"}}>{c.desc}</p>
+                {c.inviteOnly
+                  ? <button onClick={()=>onClinics(c)} style={{background:"#1d4ed8",color:"#fff",border:"none",borderRadius:12,padding:"10px 18px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Request an Invite</button>
+                  : <button onClick={()=>onClinics(c)} style={{background:"#16a34a",color:"#fff",border:"none",borderRadius:12,padding:"10px 18px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Sign Up →</button>
+                }
+              </div>
+            ))}
           </div>
-        ))}
-        <div style={{marginTop:20,paddingBottom:32}}>
-          <PrimaryBtn full disabled={!sel} onClick={()=>sel&&onBook(sel)}>
-            {sel ? `Book ${sel.name} · $${sel.price}` : "Select a session to continue"}
-          </PrimaryBtn>
-        </div>
+        )}
       </div>
     </div>
   );
 }
 
-// ── Clinics ────────────────────────────────────────────────────────────────
-function ClinicsView({ onBack, onRequestInvite, onBookCardio, lead }) {
+// ── Clinic Sign Up (Cardio) ────────────────────────────────────────────────
+function ClinicSignUpView({ clinic, onBack, lead }) {
+  const [f, setF] = useState({ name: lead?.name||"", email: lead?.email||"", phone: lead?.phone||"" });
+  const [errs, setErrs] = useState({});
+  const [submitted, setSubmitted] = useState(false);
+
+  function handleChange(id, val) { setF(p=>({...p,[id]:val})); }
+
+  function validate() {
+    const e = {};
+    if (!f.name.trim()) e.name = "Required";
+    if (!f.email.includes("@")) e.email = "Enter a valid email";
+    if (f.phone.replace(/\D/g,"").length < 10) e.phone = "Enter a valid phone";
+    return e;
+  }
+
+  function submit() {
+    const e = validate(); setErrs(e);
+    if (Object.keys(e).length) return;
+    fetch("/api/proxy", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "addToMailchimp",
+        name: f.name, email: f.email, phone: f.phone,
+        tags: ["Tennis", "Cardio Clinic"]
+      })
+    });
+    fetch("/api/proxy", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "sendEmail",
+        to: "jwlegacyrealty@gmail.com",
+        subject: "New Cardio Clinic Sign Up!",
+        body: `Someone signed up for Cardio Tennis Clinic!\n\nName: ${f.name}\nEmail: ${f.email}\nPhone: ${f.phone}`
+      })
+    });
+    setSubmitted(true);
+  }
+
+  if (submitted) return (
+    <div style={{maxWidth:480,margin:"0 auto",padding:"60px 24px",textAlign:"center"}}>
+      <div style={{fontSize:56,marginBottom:16}}>🎵</div>
+      <h1 style={{fontSize:24,fontWeight:800,color:"#0f172a",marginBottom:8}}>You're signed up!</h1>
+      <p style={{color:"#64748b",marginBottom:8}}>Jeff will be in touch to confirm your spot in the Cardio Tennis Clinic.</p>
+      <p style={{color:"#94a3b8",fontSize:13,marginBottom:24}}>Thursdays at 7:00 PM · All levels welcome</p>
+      <PrimaryBtn full onClick={onBack}>Back to Home</PrimaryBtn>
+    </div>
+  );
+
   return (
-    <div style={{maxWidth:580,margin:"0 auto"}}>
+    <div style={{maxWidth:480,margin:"0 auto"}}>
       <BackBtn onClick={onBack}/>
       <div style={{padding:"0 20px 32px"}}>
-        <h1 style={{fontSize:22,fontWeight:800,color:"#0f172a",marginBottom:4}}>Clinics</h1>
-        <p style={{fontSize:13,color:"#64748b",marginBottom:20}}>Join a group and level up your game.</p>
-
-        {CLINICS.map(c => (
-          <div key={c.id} style={{background:"#fff",border:`2px solid ${c.inviteOnly?"#e2e8f0":"#86efac"}`,borderRadius:20,padding:"18px",marginBottom:14,boxShadow:"0 1px 4px rgba(0,0,0,.05)"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
-              <div>
-                <div style={{fontWeight:700,fontSize:16,color:"#0f172a"}}>{c.emoji} {c.name}</div>
-                <div style={{fontSize:13,color:"#64748b",marginTop:2}}>{c.day} · {c.time}</div>
-                <div style={{fontSize:12,color:"#94a3b8",marginTop:2}}>Level: {c.level}</div>
-              </div>
-              {c.inviteOnly
-                ? <span style={{background:"#fef3c7",color:"#92400e",fontSize:11,fontWeight:700,padding:"4px 10px",borderRadius:20,whiteSpace:"nowrap"}}>Invite Only</span>
-                : <span style={{background:"#dcfce7",color:"#15803d",fontSize:11,fontWeight:700,padding:"4px 10px",borderRadius:20,whiteSpace:"nowrap"}}>Open</span>
-              }
-            </div>
-            <p style={{fontSize:13,color:"#475569",lineHeight:1.5,margin:"0 0 12px"}}>{c.desc}</p>
-            {c.inviteOnly
-              ? <button onClick={()=>onRequestInvite(c)} style={{background:"#1d4ed8",color:"#fff",border:"none",borderRadius:12,padding:"10px 18px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Request an Invite</button>
-              : <button onClick={()=>onBookCardio()} style={{background:"#16a34a",color:"#fff",border:"none",borderRadius:12,padding:"10px 18px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Book Now →</button>
-            }
-          </div>
-        ))}
+        <div style={{background:"#f0fdf4",borderRadius:16,padding:"14px 16px",marginBottom:20}}>
+          <div style={{fontWeight:700,fontSize:15,color:"#15803d"}}>🎵 Cardio Tennis Clinic</div>
+          <div style={{fontSize:13,color:"#16a34a"}}>Thursdays · 7:00 PM · All levels · Music!</div>
+        </div>
+        <h1 style={{fontSize:20,fontWeight:800,color:"#0f172a",marginBottom:16}}>Sign Up</h1>
+        <FormField id="name" label="Full Name" placeholder="Jane Smith" value={f.name} onChange={handleChange} error={errs.name}/>
+        <FormField id="email" label="Email" placeholder="jane@example.com" type="email" value={f.email} onChange={handleChange} error={errs.email}/>
+        <FormField id="phone" label="Phone" placeholder="(352) 555-0100" type="tel" value={f.phone} onChange={handleChange} error={errs.phone}/>
+        <div style={{marginTop:20}}>
+          <PrimaryBtn full onClick={submit}>Sign Me Up! →</PrimaryBtn>
+        </div>
       </div>
     </div>
   );
@@ -314,15 +386,11 @@ function ClinicsView({ onBack, onRequestInvite, onBookCardio, lead }) {
 
 // ── Request Invite ─────────────────────────────────────────────────────────
 function RequestInviteView({ clinic, onBack, lead }) {
-  const [f, setF] = useState({
-    name: lead?.name || "",
-    email: lead?.email || "",
-    phone: lead?.phone || "",
-    level: lead?.level || "",
-    message: ""
-  });
-  const [submitted, setSubmitted] = useState(false);
+  const [f, setF] = useState({ name: lead?.name||"", email: lead?.email||"", phone: lead?.phone||"", level: lead?.level||"", message:"" });
   const [errs, setErrs] = useState({});
+  const [submitted, setSubmitted] = useState(false);
+
+  function handleChange(id, val) { setF(p=>({...p,[id]:val})); }
 
   function validate() {
     const e = {};
@@ -336,20 +404,15 @@ function RequestInviteView({ clinic, onBack, lead }) {
   function submit() {
     const e = validate(); setErrs(e);
     if (Object.keys(e).length) return;
-    // Add to Mailchimp with Tennis + clinic tag
     fetch("/api/proxy", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         action: "addToMailchimp",
-        name: f.name,
-        email: f.email,
-        phone: f.phone,
-        level: f.level,
+        name: f.name, email: f.email, phone: f.phone, level: f.level,
         tags: ["Tennis", `Invite Request - ${clinic.name}`]
       })
     });
-    // Send email notification to Jeff
     fetch("/api/proxy", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -357,7 +420,7 @@ function RequestInviteView({ clinic, onBack, lead }) {
         action: "sendEmail",
         to: "jwlegacyrealty@gmail.com",
         subject: `New Clinic Invite Request — ${clinic.name}`,
-        body: `Name: ${f.name}\nEmail: ${f.email}\nPhone: ${f.phone}\nLevel: ${f.level}\nClinic: ${clinic.name}\nMessage: ${f.message || "None"}`
+        body: `Name: ${f.name}\nEmail: ${f.email}\nPhone: ${f.phone}\nLevel: ${f.level}\nClinic: ${clinic.name}\nMessage: ${f.message||"None"}`
       })
     });
     setSubmitted(true);
@@ -368,7 +431,7 @@ function RequestInviteView({ clinic, onBack, lead }) {
       <div style={{fontSize:56,marginBottom:16}}>🎾</div>
       <h1 style={{fontSize:24,fontWeight:800,color:"#0f172a",marginBottom:8}}>Request Sent!</h1>
       <p style={{color:"#64748b",marginBottom:24}}>Jeff will review your request and reach out about joining the {clinic.name}.</p>
-      <PrimaryBtn full onClick={onBack}>Back to Clinics</PrimaryBtn>
+      <PrimaryBtn full onClick={onBack}>Back to Home</PrimaryBtn>
     </div>
   );
 
@@ -380,34 +443,16 @@ function RequestInviteView({ clinic, onBack, lead }) {
           <div style={{fontWeight:700,fontSize:15,color:"#1d4ed8"}}>{clinic.emoji} {clinic.name}</div>
           <div style={{fontSize:13,color:"#3b82f6"}}>{clinic.day} · {clinic.time} · {clinic.level}</div>
         </div>
-
         <h1 style={{fontSize:20,fontWeight:800,color:"#0f172a",marginBottom:16}}>Request an Invite</h1>
-
-        {[["name","Full Name","Jane Smith","text"],["email","Email","jane@example.com","email"],["phone","Phone","(352) 555-0100","tel"]].map(([id,label,ph,type])=>(
-          <div key={id} style={{marginBottom:12}}>
-            <label style={{display:"block",fontSize:12,fontWeight:600,color:"#374151",marginBottom:4}}>{label}</label>
-            <input type={type} placeholder={ph} value={f[id]} onChange={e=>setF(p=>({...p,[id]:e.target.value}))}
-              style={{width:"100%",padding:"11px 14px",borderRadius:12,border:`1.5px solid ${errs[id]?"#f87171":"#e2e8f0"}`,fontSize:14,outline:"none",boxSizing:"border-box"}}/>
-            {errs[id] && <p style={{color:"#ef4444",fontSize:11,margin:"3px 0 0"}}>{errs[id]}</p>}
-          </div>
-        ))}
-
-        <div style={{marginBottom:12}}>
-          <label style={{display:"block",fontSize:12,fontWeight:600,color:"#374151",marginBottom:4}}>Skill Level</label>
-          <select value={f.level} onChange={e=>setF(p=>({...p,level:e.target.value}))}
-            style={{width:"100%",padding:"11px 14px",borderRadius:12,border:`1.5px solid ${errs.level?"#f87171":"#e2e8f0"}`,fontSize:14,outline:"none",background:"#fff",boxSizing:"border-box"}}>
-            <option value="">Select...</option>
-            {LEVELS.map(l=><option key={l} value={l}>{l}</option>)}
-          </select>
-          {errs.level && <p style={{color:"#ef4444",fontSize:11,margin:"3px 0 0"}}>{errs.level}</p>}
-        </div>
-
+        <FormField id="name" label="Full Name" placeholder="Jane Smith" value={f.name} onChange={handleChange} error={errs.name}/>
+        <FormField id="email" label="Email" placeholder="jane@example.com" type="email" value={f.email} onChange={handleChange} error={errs.email}/>
+        <FormField id="phone" label="Phone" placeholder="(352) 555-0100" type="tel" value={f.phone} onChange={handleChange} error={errs.phone}/>
+        <FormSelect id="level" label="Skill Level" options={LEVELS} value={f.level} onChange={handleChange} error={errs.level}/>
         <div style={{marginBottom:20}}>
           <label style={{display:"block",fontSize:12,fontWeight:600,color:"#374151",marginBottom:4}}>Anything else Jeff should know? (optional)</label>
           <textarea value={f.message} onChange={e=>setF(p=>({...p,message:e.target.value}))} placeholder="e.g. I played college tennis, currently working on my backhand..."
             style={{width:"100%",padding:"11px 14px",borderRadius:12,border:"1.5px solid #e2e8f0",fontSize:14,outline:"none",boxSizing:"border-box",minHeight:80,resize:"vertical"}}/>
         </div>
-
         <PrimaryBtn full onClick={submit}>Send Request →</PrimaryBtn>
       </div>
     </div>
@@ -502,13 +547,12 @@ function DateTimeView({ service, onConfirm, onBack }) {
 
 // ── Checkout ───────────────────────────────────────────────────────────────
 function CheckoutView({ service, date, slot, onConfirm, onBack, lead }) {
-  const [f, setF] = useState({
-    name: lead?.name||"", email: lead?.email||"", phone: lead?.phone||"",
-    card:"", exp:"", cvv:""
-  });
+  const [f, setF] = useState({ name: lead?.name||"", email: lead?.email||"", phone: lead?.phone||"", card:"", exp:"", cvv:"" });
   const [errs, setErrs] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const dateStr = date.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"});
+
+  function handleChange(id, val) { setF(p=>({...p,[id]:val})); }
 
   function validate() {
     const e={};
@@ -529,18 +573,6 @@ function CheckoutView({ service, date, slot, onConfirm, onBack, lead }) {
     setSubmitting(false);
   }
 
-  function Field({id,label,placeholder,type="text",maxLength,half}) {
-    return (
-      <div style={{flex:half?"1":"unset"}}>
-        <label style={{display:"block",fontSize:12,fontWeight:600,color:"#374151",marginBottom:4}}>{label}</label>
-        <input type={type} placeholder={placeholder} maxLength={maxLength} value={f[id]}
-          onChange={e=>setF(p=>({...p,[id]:e.target.value}))}
-          style={{width:"100%",padding:"11px 14px",borderRadius:12,border:`1.5px solid ${errs[id]?"#f87171":"#e2e8f0"}`,fontSize:14,outline:"none",boxSizing:"border-box"}}/>
-        {errs[id] && <p style={{color:"#ef4444",fontSize:11,marginTop:3}}>{errs[id]}</p>}
-      </div>
-    );
-  }
-
   return (
     <div style={{maxWidth:480,margin:"0 auto"}}>
       <BackBtn onClick={onBack}/>
@@ -558,19 +590,19 @@ function CheckoutView({ service, date, slot, onConfirm, onBack, lead }) {
         </div>
         <h2 style={{fontSize:15,fontWeight:700,color:"#0f172a",marginBottom:12}}>Your Information</h2>
         <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:20}}>
-          <Field id="name" label="Full Name" placeholder="Jane Smith"/>
-          <Field id="email" label="Email" placeholder="jane@example.com" type="email"/>
-          <Field id="phone" label="Phone" placeholder="(352) 555-0100" type="tel"/>
+          <FormField id="name" label="Full Name" placeholder="Jane Smith" value={f.name} onChange={handleChange} error={errs.name}/>
+          <FormField id="email" label="Email" placeholder="jane@example.com" type="email" value={f.email} onChange={handleChange} error={errs.email}/>
+          <FormField id="phone" label="Phone" placeholder="(352) 555-0100" type="tel" value={f.phone} onChange={handleChange} error={errs.phone}/>
         </div>
         <h2 style={{fontSize:15,fontWeight:700,color:"#0f172a",marginBottom:8}}>Payment</h2>
         <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:10,padding:"8px 12px",fontSize:12,color:"#1e40af",marginBottom:12,display:"flex",gap:6}}>
           🔒 Secure demo checkout — no real charge
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:22}}>
-          <Field id="card" label="Card Number" placeholder="1234 5678 9012 3456" maxLength={19}/>
+          <FormField id="card" label="Card Number" placeholder="1234 5678 9012 3456" value={f.card} onChange={handleChange} error={errs.card}/>
           <div style={{display:"flex",gap:12}}>
-            <Field id="exp" label="Expiry" placeholder="MM/YY" maxLength={5} half/>
-            <Field id="cvv" label="CVV" placeholder="123" maxLength={4} half/>
+            <FormField id="exp" label="Expiry" placeholder="MM/YY" value={f.exp} onChange={handleChange} error={errs.exp}/>
+            <FormField id="cvv" label="CVV" placeholder="123" value={f.cvv} onChange={handleChange} error={errs.cvv}/>
           </div>
         </div>
         <PrimaryBtn full disabled={submitting} onClick={submit}>
@@ -612,7 +644,6 @@ function ConfirmView({ service, date, slot, customer, onHome }) {
 function DashboardView({ bookings, leads, onBack }) {
   const [tab, setTab] = useState("bookings");
   const revenue = bookings.reduce((s,b)=>s+b.service.price,0);
-  const upcoming = bookings.filter(b=>b.date>=new Date());
 
   return (
     <div style={{maxWidth:600,margin:"0 auto"}}>
@@ -623,7 +654,6 @@ function DashboardView({ bookings, leads, onBack }) {
         </div>
         <button onClick={onBack} style={{background:"none",border:"1px solid #e2e8f0",color:"#374151",padding:"7px 14px",borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer"}}>← Back</button>
       </div>
-
       <div style={{padding:"20px"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:24}}>
           {[["📋","Bookings",bookings.length],["💰","Revenue",`$${revenue}`],["👥","Leads",leads.length]].map(([icon,label,val])=>(
@@ -634,18 +664,16 @@ function DashboardView({ bookings, leads, onBack }) {
             </div>
           ))}
         </div>
-
         <div style={{display:"flex",gap:8,marginBottom:20}}>
           {["bookings","leads"].map(t=>(
             <button key={t} onClick={()=>setTab(t)} style={{
               padding:"8px 20px",borderRadius:20,fontWeight:600,fontSize:13,cursor:"pointer",
               background:tab===t?"#1d4ed8":"#fff", color:tab===t?"#fff":"#64748b",
               border:tab===t?"none":"1px solid #e2e8f0"
-            }}>{t === "bookings" ? "Bookings" : "Leads"}</button>
+            }}>{t==="bookings"?"Bookings":"Leads"}</button>
           ))}
         </div>
-
-        {tab === "bookings" && (
+        {tab==="bookings" && (
           bookings.length===0
             ? <div style={{textAlign:"center",padding:"48px 0",color:"#94a3b8"}}><div style={{fontSize:40,marginBottom:8}}>📭</div><p style={{margin:0,fontSize:14}}>No bookings yet.</p></div>
             : bookings.map((b,i)=>(
@@ -662,8 +690,7 @@ function DashboardView({ bookings, leads, onBack }) {
               </div>
             ))
         )}
-
-        {tab === "leads" && (
+        {tab==="leads" && (
           leads.length===0
             ? <div style={{textAlign:"center",padding:"48px 0",color:"#94a3b8"}}><div style={{fontSize:40,marginBottom:8}}>👥</div><p style={{margin:0,fontSize:14}}>No leads yet.</p></div>
             : leads.map((l,i)=>(
@@ -697,18 +724,13 @@ export default function App() {
   async function handleEnter(info) {
     setLead(info);
     setLeads(l => [...l, info]);
-    // Add to Mailchimp with Tennis tag
     fetch("/api/proxy", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         action: "addToMailchimp",
-        name: info.name,
-        email: info.email,
-        phone: info.phone,
-        level: info.level,
-        goal: info.goal,
-        tags: ["Tennis"]
+        name: info.name, email: info.email, phone: info.phone,
+        level: info.level, goal: info.goal, tags: ["Tennis"]
       })
     });
     setView("home");
@@ -721,20 +743,23 @@ export default function App() {
     setView("confirm");
   }
 
-  function reset() { setService(null); setDate(null); setSlot(null); setCustomer(null); setView("home"); }
+  function handleClinicAction(clinic) {
+    setSelectedClinic(clinic);
+    setView(clinic.inviteOnly ? "requestinvite" : "clinicsignup");
+  }
 
-  const cardioService = COACH.services.find(s => s.id === "b");
+  function reset() { setService(null); setDate(null); setSlot(null); setCustomer(null); setView("home"); }
 
   return (
     <div style={{minHeight:"100vh",background:"#f8fafc",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
-      {view==="welcome"       && <WelcomeView onEnter={handleEnter}/>}
-      {view==="home"          && <HomeView onBook={s=>{setService(s);setView("datetime");}} onClinics={()=>setView("clinics")} onDashboard={()=>setView("dashboard")} lead={lead}/>}
-      {view==="clinics"       && <ClinicsView onBack={()=>setView("home")} onRequestInvite={c=>{setSelectedClinic(c);setView("requestinvite");}} onBookCardio={()=>{setService(cardioService);setView("datetime");}} lead={lead}/>}
-      {view==="requestinvite" && <RequestInviteView clinic={selectedClinic} onBack={()=>setView("clinics")} lead={lead}/>}
-      {view==="datetime"      && <DateTimeView service={service} onConfirm={(d,s)=>{setDate(d);setSlot(s);setView("checkout");}} onBack={()=>setView("home")}/>}
-      {view==="checkout"      && <CheckoutView service={service} date={date} slot={slot} onConfirm={handleCheckout} onBack={()=>setView("datetime")} lead={lead}/>}
-      {view==="confirm"       && <ConfirmView service={service} date={date} slot={slot} customer={customer} onHome={reset}/>}
-      {view==="dashboard"     && <DashboardView bookings={bookings} leads={leads} onBack={()=>setView("home")}/>}
+      {view==="welcome"      && <WelcomeView onEnter={handleEnter}/>}
+      {view==="home"         && <HomeView onBook={s=>{setService(s);setView("datetime");}} onClinics={handleClinicAction} onDashboard={()=>setView("dashboard")} lead={lead}/>}
+      {view==="clinicsignup" && <ClinicSignUpView clinic={selectedClinic} onBack={()=>setView("home")} lead={lead}/>}
+      {view==="requestinvite"&& <RequestInviteView clinic={selectedClinic} onBack={()=>setView("home")} lead={lead}/>}
+      {view==="datetime"     && <DateTimeView service={service} onConfirm={(d,s)=>{setDate(d);setSlot(s);setView("checkout");}} onBack={()=>setView("home")}/>}
+      {view==="checkout"     && <CheckoutView service={service} date={date} slot={slot} onConfirm={handleCheckout} onBack={()=>setView("datetime")} lead={lead}/>}
+      {view==="confirm"      && <ConfirmView service={service} date={date} slot={slot} customer={customer} onHome={reset}/>}
+      {view==="dashboard"    && <DashboardView bookings={bookings} leads={leads} onBack={()=>setView("home")}/>}
     </div>
   );
 }
