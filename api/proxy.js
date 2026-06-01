@@ -36,6 +36,14 @@ export default async function handler(req, res) {
         body: JSON.stringify(event),
       });
       const calData = await calRes.json();
+
+      // Send booking notification email to Jeff
+      await sendEmailViaResend(
+        'jwlegacyrealty@gmail.com',
+        `New Booking — ${event.summary}`,
+        `A new session has been booked!\n\n${event.description}\n\nDate/Time: ${event.start.dateTime}\n\nThis has been added to your Google Calendar automatically.`
+      );
+
       return res.status(200).json(calData);
     }
 
@@ -73,10 +81,10 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true });
     }
 
-    // ── Email: Log notification ───────────────────────────────────────────
+    // ── Email: Send via Resend ────────────────────────────────────────────
     if (action === 'sendEmail') {
       const { to, subject, body } = req.body;
-      console.log(`EMAIL NOTIFICATION\nTO: ${to}\nSUBJECT: ${subject}\nBODY: ${body}`);
+      await sendEmailViaResend(to, subject, body);
       return res.status(200).json({ success: true });
     }
 
@@ -102,4 +110,23 @@ async function getGoogleAccessToken() {
   const data = await response.json();
   if (!data.access_token) throw new Error('Failed to get access token: ' + JSON.stringify(data));
   return data.access_token;
+}
+
+async function sendEmailViaResend(to, subject, body) {
+  const emailRes = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: 'Court Pro <onboarding@resend.dev>',
+      to: [to],
+      subject: subject,
+      text: body,
+    }),
+  });
+  const emailData = await emailRes.json();
+  console.log('Resend response:', JSON.stringify(emailData));
+  return emailData;
 }
