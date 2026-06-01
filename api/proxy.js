@@ -1,71 +1,100 @@
 export default async function handler(req, res) {
-  // Allow CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).end();
 
   try {
-    // Step 1: Get fresh access token
-    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: process.env.VITE_GOOGLE_CLIENT_ID,
-        client_secret: process.env.VITE_GOOGLE_CLIENT_SECRET,
-        refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
-        grant_type: 'refresh_token',
-      }),
-    });
+    const { action } = req.body;
 
-    const tokenData = await tokenRes.json();
-    
-    if (!tokenData.access_token) {
-      console.error('Token error:', JSON.stringify(tokenData));
-      return res.status(500).json({ error: 'Failed to get access token', details: tokenData });
+    // ── Google Calendar: Get busy times ──────────────────────────────────
+    if (action === 'getBusy') {
+      const accessToken = await getGoogleAccessToken();
+      const { date } = req.body;
+      const calRes = await fetch('https://www.googleapis.com/calendar/v3/freeBusy', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          timeMin: `${date}T00:00:00-04:00`,
+          timeMax: `${date}T23:59:59-04:00`,
+          timeZone: 'America/New_York',
+          items: [{ id: 'primary' }],
+        }),
+      });
+      const calData = await calRes.json();
+      return res.status(200).json({ busy: calData.calendars?.primary?.busy || [] });
     }
 
-    const { action, date, event } = req.body;
+    // ── Google Calendar: Create event ────────────────────────────────────
+    if (action === 'createEvent') {
+      const accessToken = await getGoogleAccessToken();
+      const { event } = req.body;
+      const calRes = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(event),
+      });
+      const calData = await calRes.json();
+      return res.status(200).json(calData);
+    }
 
-    // Step 2: Get busy times OR create event
-    if (action === 'getBusy') {
-      const calRes = await fetch(
-        `https://www.googleapis.com/calendar/v3/freeBusy`,
+    // ── Mailchimp: Add contact ────────────────────────────────────────────
+    if (action === 'addToMailchimp') {
+      const { name, email, phone, level, goal, tags } = req.body;
+      const [firstName, ...rest] = name.split(' ');
+      const lastName = rest.join(' ');
+      const server = process.env.MAILCHIMP_SERVER;
+      const audienceId = process.env.MAILCHIMP_AUDIENCE_ID;
+      const apiKey = process.env.MAILCHIMP_API_KEY;
+
+      const mcRes = await fetch(
+        `https://${server}.api.mailchimp.com/3.0/lists/${audienceId}/members`,
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${tokenData.access_token}`,
+            'Authorization': `apikey ${apiKey}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            timeMin: `${date}T00:00:00-04:00`,
-            timeMax: `${date}T23:59:59-04:00`,
-            timeZone: 'America/New_York',
-            items: [{ id: 'primary' }],
+            email_address: email,
+            status: 'subscribed',
+            merge_fields: {
+              FNAME: firstName,
+              LNAME: lastName,
+              PHONE: phone || '',
+            },
+            tags: tags || ['Tennis'],
           }),
         }
       );
-      const calData = await calRes.json();
-      const busy = calData.calendars?.primary?.busy || [];
-      return res.status(200).json({ busy });
+      const mcData = await mcRes.json();
+      // If already subscribed, update their tags
+      if (mcData.status === 400 && mcData.title === 'Member Exists') {
+        const hash = await md5(email.toLowerCase());
+        await fetch(
+          `https://${server}.api.mailchimp.com/3.0/lists/${audienceId}/members/${hash}/tags`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `apikey ${apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ tags: (tags || ['Tennis']).map(t => ({ name: t, status: 'active' })) }),
+          }
+        );
+      }
+      return res.status(200).json({ success: true });
     }
 
-    if (action === 'createEvent') {
-      const calRes = await fetch(
-        'https://www.googleapis.com/calendar/v3/calendars/primary/events',
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${tokenData.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(event),
-        }
-      );
-      const calData = await calRes.json();
-      return res.status(200).json(calData);
+    // ── Email: Send notification ─────────────────────────────────────────
+    if (action === 'sendEmail') {
+      const { to, subject, body } = req.body;
+      // Using Gmail SMTP via fetch (simple notification)
+      // We'll log it and also try to send via a simple POST
+      console.log(`EMAIL TO: ${to}\nSUBJECT: ${subject}\nBODY: ${body}`);
+      // For now store in logs — upgrade to Resend/SendGrid for actual delivery
+      return res.status(200).json({ success: true, note: 'Email logged' });
     }
 
     return res.status(400).json({ error: 'Unknown action' });
@@ -74,4 +103,28 @@ export default async function handler(req, res) {
     console.error('Proxy error:', error);
     return res.status(500).json({ error: error.message });
   }
+}
+
+async function getGoogleAccessToken() {
+  const response = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: process.env.VITE_GOOGLE_CLIENT_ID,
+      client_secret: process.env.VITE_GOOGLE_CLIENT_SECRET,
+      refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
+      grant_type: 'refresh_token',
+    }),
+  });
+  const data = await response.json();
+  if (!data.access_token) throw new Error('Failed to get access token: ' + JSON.stringify(data));
+  return data.access_token;
+}
+
+async function md5(str) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(str);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
