@@ -19,11 +19,22 @@ const COACH = {
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function generateSlots(durationMins) {
+function generateSlots(durationMins, date) {
+  const day = date.getDay(); // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+
+  let startHour, endHour;
+  if (day >= 1 && day <= 4) {
+    startHour = 16; endHour = 21; // Mon–Thu: 4pm–9pm
+  } else if (day === 5 || day === 6) {
+    startHour = 8; endHour = 12;  // Fri–Sat: 8am–12pm
+  } else {
+    return []; // Sunday: closed
+  }
+
   const slots = [];
-  for (let h = 7; h < 20; h++) {
+  for (let h = startHour; h < endHour; h++) {
     for (let m = 0; m < 60; m += 30) {
-      if (h * 60 + m + durationMins > 20 * 60) continue;
+      if (h * 60 + m + durationMins > endHour * 60) continue;
       slots.push({
         label: `${h % 12 || 12}:${m === 0 ? "00" : m} ${h < 12 ? "AM" : "PM"}`,
         value: `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`
@@ -158,7 +169,7 @@ function DateTimeView({ service, onConfirm, onBack }) {
     setSelDate(d); setSelSlot(null); setLoading(true); setErr("");
     try {
       const busy = await fetchAvailability(fmt(d));
-      const all = generateSlots(service.duration);
+      const all = generateSlots(service.duration, d);
       setSlots(all.filter(sl => {
         const s=toMins(sl.value), e=s+service.duration;
         return !busy.some(b=>overlaps(s,e,toMins(b.start),toMins(b.end)));
