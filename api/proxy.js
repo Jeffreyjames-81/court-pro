@@ -44,7 +44,7 @@ export default async function handler(req, res) {
       return res.status(200).json(calData);
     }
 
-    // ── Mailchimp: Add contact ────────────────────────────────────────────
+    // ── Mailchimp: Add/update contact ─────────────────────────────────────
     if (action === 'addToMailchimp') {
       const { name, email, phone, level, goal, tags } = req.body;
       const [firstName, ...rest] = name.split(' ');
@@ -52,31 +52,45 @@ export default async function handler(req, res) {
       const server = process.env.MAILCHIMP_SERVER;
       const audienceId = process.env.MAILCHIMP_AUDIENCE_ID;
       const apiKey = process.env.MAILCHIMP_API_KEY;
+      const authHeader = 'Basic ' + Buffer.from(`anystring:${apiKey}`).toString('base64');
 
-      console.log('Mailchimp attempt:', { server, audienceId, email, tags });
-
+      // Use PUT (upsert) — adds new or updates existing contacts
       const mcRes = await fetch(
-        `https://${server}.api.mailchimp.com/3.0/lists/${audienceId}/members`,
+        `https://${server}.api.mailchimp.com/3.0/lists/${audienceId}/members/${encodeURIComponent(email.toLowerCase())}`,
         {
-          method: 'POST',
+          method: 'PUT',
           headers: {
-            'Authorization': `apikey ${apiKey}`,
+            'Authorization': authHeader,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             email_address: email,
+            status_if_new: 'subscribed',
             status: 'subscribed',
             merge_fields: {
               FNAME: firstName,
               LNAME: lastName,
               PHONE: phone || '',
             },
-            tags: tags || ['Tennis'],
           }),
         }
       );
       const mcData = await mcRes.json();
-      console.log('Mailchimp response:', JSON.stringify(mcData));
+      console.log('Mailchimp upsert response:', JSON.stringify(mcData));
+
+      // Apply tags separately
+      if (tags && tags.length > 0) {
+        const tagRes = await fetch(
+          `https://${server}.api.mailchimp.com/3.0/lists/${audienceId}/members/${encodeURIComponent(email.toLowerCase())}/tags`,
+          {
+            method: 'POST',
+            headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tags: tags.map(t => ({ name: t, status: 'active' })) }),
+          }
+        );
+        console.log('Mailchimp tags status:', tagRes.status);
+      }
+
       return res.status(200).json({ success: true, mailchimp: mcData });
     }
 
