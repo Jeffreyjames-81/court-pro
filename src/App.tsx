@@ -39,23 +39,14 @@ async function fetchAvailability(dateStr) {
   const res = await fetch("/api/proxy", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1000,
-      system: `You are a calendar assistant. Use Google Calendar to list events on the given date.
-Return ONLY a valid JSON array of busy time ranges in 24h HH:MM format, e.g. [{"start":"09:00","end":"10:30"}].
-If no events, return []. No markdown, no extra text.`,
-      messages: [{ role: "user", content: `List all calendar events on ${dateStr}. Return only JSON array.` }],
-      mcp_servers: [{ type: "url", url: "https://calendarmcp.googleapis.com/mcp/v1", name: "google-calendar" }]
-    })
+    body: JSON.stringify({ action: "getBusy", date: dateStr })
   });
   const data = await res.json();
-  const txt = (data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("");
-  try {
-    const match = txt.replace(/```json|```/g,"").trim().match(/\[[\s\S]*\]/);
-    const parsed = JSON.parse(match ? match[0] : "[]");
-    return Array.isArray(parsed) ? parsed : [];
-  } catch { return []; }
+  if (!data.busy) return [];
+  return data.busy.map(b => ({
+    start: b.start.split("T")[1].substring(0,5),
+    end: b.end.split("T")[1].substring(0,5)
+  }));
 }
 
 async function createCalendarEvent(service, dateStr, timeStr, customer) {
@@ -66,16 +57,13 @@ async function createCalendarEvent(service, dateStr, timeStr, customer) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 500,
-      messages: [{ role: "user", content:
-`Create a Google Calendar event:
-Title: Tennis – ${service.name} with ${customer.name}
-Start: ${dateStr}T${timeStr}:00
-End: ${dateStr}T${endStr}:00
-Description: Client: ${customer.name} | ${customer.email} | ${customer.phone} | Session: ${service.name} | $${service.price}
-Please create this event now.` }],
-      mcp_servers: [{ type: "url", url: "https://calendarmcp.googleapis.com/mcp/v1", name: "google-calendar" }]
+      action: "createEvent",
+      event: {
+        summary: `Tennis – ${service.name} with ${customer.name}`,
+        description: `Client: ${customer.name} | ${customer.email} | ${customer.phone} | $${service.price}`,
+        start: { dateTime: `${dateStr}T${timeStr}:00`, timeZone: "America/New_York" },
+        end: { dateTime: `${dateStr}T${endStr}:00`, timeZone: "America/New_York" },
+      }
     })
   });
 }
