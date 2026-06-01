@@ -134,10 +134,39 @@ function PrimaryBtn({ children, onClick, disabled, full }) {
   );
 }
 
+// ── Reusable form fields ───────────────────────────────────────────────────
+function FormField({ id, label, placeholder, type="text", value, onChange, error }) {
+  return (
+    <div style={{marginBottom:12}}>
+      <label style={{display:"block",fontSize:12,fontWeight:600,color:"#374151",marginBottom:4}}>{label}</label>
+      <input type={type} placeholder={placeholder} value={value}
+        onChange={e=>onChange(id, e.target.value)}
+        style={{width:"100%",padding:"11px 14px",borderRadius:12,border:`1.5px solid ${error?"#f87171":"#e2e8f0"}`,fontSize:14,outline:"none",boxSizing:"border-box"}}/>
+      {error && <p style={{color:"#ef4444",fontSize:11,margin:"3px 0 0"}}>{error}</p>}
+    </div>
+  );
+}
+
+function FormSelect({ id, label, options, value, onChange, error }) {
+  return (
+    <div style={{marginBottom:12}}>
+      <label style={{display:"block",fontSize:12,fontWeight:600,color:"#374151",marginBottom:4}}>{label}</label>
+      <select value={value} onChange={e=>onChange(id, e.target.value)}
+        style={{width:"100%",padding:"11px 14px",borderRadius:12,border:`1.5px solid ${error?"#f87171":"#e2e8f0"}`,fontSize:14,outline:"none",background:"#fff",boxSizing:"border-box"}}>
+        <option value="">Select...</option>
+        {options.map(o=><option key={o} value={o}>{o}</option>)}
+      </select>
+      {error && <p style={{color:"#ef4444",fontSize:11,margin:"3px 0 0"}}>{error}</p>}
+    </div>
+  );
+}
+
 // ── Welcome / Lead Capture ─────────────────────────────────────────────────
 function WelcomeView({ onEnter }) {
   const [f, setF] = useState({ name:"", email:"", phone:"", level:"", goal:"" });
   const [errs, setErrs] = useState({});
+
+  function handleChange(id, val) { setF(p=>({...p,[id]:val})); }
 
   function validate() {
     const e = {};
@@ -153,32 +182,6 @@ function WelcomeView({ onEnter }) {
     const e = validate(); setErrs(e);
     if (Object.keys(e).length) return;
     onEnter(f);
-  }
-
-  function Field({ id, label, placeholder, type="text" }) {
-    return (
-      <div style={{marginBottom:12}}>
-        <label style={{display:"block",fontSize:12,fontWeight:600,color:"#374151",marginBottom:4}}>{label}</label>
-        <input type={type} placeholder={placeholder} value={f[id]}
-          onChange={e=>setF(p=>({...p,[id]:e.target.value}))}
-          style={{width:"100%",padding:"11px 14px",borderRadius:12,border:`1.5px solid ${errs[id]?"#f87171":"#e2e8f0"}`,fontSize:14,outline:"none",boxSizing:"border-box"}}/>
-        {errs[id] && <p style={{color:"#ef4444",fontSize:11,margin:"3px 0 0"}}>{errs[id]}</p>}
-      </div>
-    );
-  }
-
-  function Select({ id, label, options }) {
-    return (
-      <div style={{marginBottom:12}}>
-        <label style={{display:"block",fontSize:12,fontWeight:600,color:"#374151",marginBottom:4}}>{label}</label>
-        <select value={f[id]} onChange={e=>setF(p=>({...p,[id]:e.target.value}))}
-          style={{width:"100%",padding:"11px 14px",borderRadius:12,border:`1.5px solid ${errs[id]?"#f87171":"#e2e8f0"}`,fontSize:14,outline:"none",background:"#fff",boxSizing:"border-box"}}>
-          <option value="">Select...</option>
-          {options.map(o=><option key={o} value={o}>{o}</option>)}
-        </select>
-        {errs[id] && <p style={{color:"#ef4444",fontSize:11,margin:"3px 0 0"}}>{errs[id]}</p>}
-      </div>
-    );
   }
 
   return (
@@ -197,11 +200,11 @@ function WelcomeView({ onEnter }) {
           Tell us a little about yourself to get started!
         </p>
 
-        <Field id="name" label="Full Name" placeholder="Jane Smith"/>
-        <Field id="email" label="Email" placeholder="jane@example.com" type="email"/>
-        <Field id="phone" label="Phone" placeholder="(352) 555-0100" type="tel"/>
-        <Select id="level" label="Skill Level" options={LEVELS}/>
-        <Select id="goal" label="What brings you here?" options={GOALS}/>
+        <FormField id="name" label="Full Name" placeholder="Jane Smith" value={f.name} onChange={handleChange} error={errs.name}/>
+        <FormField id="email" label="Email" placeholder="jane@example.com" type="email" value={f.email} onChange={handleChange} error={errs.email}/>
+        <FormField id="phone" label="Phone" placeholder="(352) 555-0100" type="tel" value={f.phone} onChange={handleChange} error={errs.phone}/>
+        <FormSelect id="level" label="Skill Level" options={LEVELS} value={f.level} onChange={handleChange} error={errs.level}/>
+        <FormSelect id="goal" label="What brings you here?" options={GOALS} value={f.goal} onChange={handleChange} error={errs.goal}/>
 
         <div style={{marginTop:20}}>
           <PrimaryBtn full onClick={submit}>Let's Play →</PrimaryBtn>
