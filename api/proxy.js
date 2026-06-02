@@ -1,3 +1,5 @@
+import crypto from 'crypto';
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -46,7 +48,7 @@ export default async function handler(req, res) {
 
     // ── Mailchimp: Add/update contact ─────────────────────────────────────
     if (action === 'addToMailchimp') {
-      const { name, email, phone, level, goal, tags } = req.body;
+      const { name, email, phone, tags } = req.body;
       const [firstName, ...rest] = name.split(' ');
       const lastName = rest.join(' ');
       const server = process.env.MAILCHIMP_SERVER;
@@ -54,15 +56,15 @@ export default async function handler(req, res) {
       const apiKey = process.env.MAILCHIMP_API_KEY;
       const authHeader = 'Basic ' + Buffer.from(`anystring:${apiKey}`).toString('base64');
 
-      // Use PUT (upsert) — adds new or updates existing contacts
+      // MD5 hash of lowercase email — required by Mailchimp PUT endpoint
+      const emailHash = crypto.createHash('md5').update(email.toLowerCase()).digest('hex');
+      console.log('Mailchimp attempt:', { server, audienceId, email, emailHash, tags });
+
       const mcRes = await fetch(
-        `https://${server}.api.mailchimp.com/3.0/lists/${audienceId}/members/${encodeURIComponent(email.toLowerCase())}`,
+        `https://${server}.api.mailchimp.com/3.0/lists/${audienceId}/members/${emailHash}`,
         {
           method: 'PUT',
-          headers: {
-            'Authorization': authHeader,
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
           body: JSON.stringify({
             email_address: email,
             status_if_new: 'subscribed',
@@ -81,7 +83,7 @@ export default async function handler(req, res) {
       // Apply tags separately
       if (tags && tags.length > 0) {
         const tagRes = await fetch(
-          `https://${server}.api.mailchimp.com/3.0/lists/${audienceId}/members/${encodeURIComponent(email.toLowerCase())}/tags`,
+          `https://${server}.api.mailchimp.com/3.0/lists/${audienceId}/members/${emailHash}/tags`,
           {
             method: 'POST',
             headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
