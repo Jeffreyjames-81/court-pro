@@ -792,34 +792,36 @@ export default function App() {
   const [recurring, setRecurring] = useState(false);
   const [recurringDates, setRecurringDates] = useState([]);
   const [customer, setCustomer] = useState(null);
-  const [bookings, setBookings] = useState([]);
-  const [leads, setLeads] = useState([]);
+  const [bookings, setBookings] = useState(() => { try { return JSON.parse(localStorage.getItem("cp_bookings")||"[]"); } catch { return []; } });
+  const [leads, setLeads] = useState(() => { try { return JSON.parse(localStorage.getItem("cp_leads")||"[]"); } catch { return []; } });
   const [selectedClinic, setSelectedClinic] = useState(null);
+
+  function saveLeads(newLeads) { setLeads(newLeads); try { localStorage.setItem("cp_leads", JSON.stringify(newLeads)); } catch {} }
+  function saveBookings(newBookings) { setBookings(newBookings); try { localStorage.setItem("cp_bookings", JSON.stringify(newBookings)); } catch {} }
 
   async function handleEnter(info, isReturning) {
     setLead(info);
     if (!isReturning) {
-      setLeads(l => [...l, info]);
-      fetch("/api/proxy", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ action:"addToMailchimp", name:info.name, email:info.email, phone:info.phone, level:info.level, goal:info.goal, tags:["Tennis"] }) });
+      const existing = leads.find(l => l.email.toLowerCase() === info.email.toLowerCase());
+      if (!existing) {
+        saveLeads([...leads, info]);
+        fetch("/api/proxy", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ action:"addToMailchimp", name:info.name, email:info.email, phone:info.phone, level:info.level, goal:info.goal, tags:["Tennis"] }) });
+      }
     }
-    setView(isReturning ? "portal" : "home");
+    setView("portal");
   }
 
   async function handleCheckout(customerInfo) {
-    // Book first session
     await createCalendarEvent(service, fmtDate(date), slot.value, customerInfo);
-    const allBookings = [{ service, date, slot, customer: customerInfo }];
-
-    // Book recurring sessions
+    const allNewBookings = [{ service, date: fmtDate(date), slot, customer: customerInfo }];
     if (recurring && recurringDates.length > 0) {
       for (const w of recurringDates.filter(w => w.available)) {
         await createCalendarEvent(service, w.dateStr, slot.value, customerInfo);
-        allBookings.push({ service, date: w.date, slot, customer: customerInfo });
+        allNewBookings.push({ service, date: w.dateStr, slot, customer: customerInfo });
       }
     }
-
     setCustomer(customerInfo);
-    setBookings(b => [...b, ...allBookings]);
+    saveBookings([...bookings, ...allNewBookings]);
     setView("confirm");
   }
 
@@ -839,7 +841,7 @@ export default function App() {
       {view==="datetime"     && <DateTimeView service={service} onConfirm={(d,s,r,rd)=>{setDate(d);setSlot(s);setRecurring(r);setRecurringDates(rd||[]);setView("checkout");}} onBack={()=>setView("home")}/>}
       {view==="checkout"     && <CheckoutView service={service} date={date} slot={slot} recurring={recurring} recurringDates={recurringDates} onConfirm={handleCheckout} onBack={()=>setView("datetime")} lead={lead}/>}
       {view==="confirm"      && <ConfirmView service={service} date={date} slot={slot} customer={customer} recurring={recurring} bookedDates={recurringDates?.filter(w=>w.available)} onHome={reset} onPortal={()=>setView("portal")}/>}
-      {view==="portal"       && <ClientPortalView bookings={bookings} lead={lead} onBack={()=>setView("home")}/>}
+      {view==="portal"       && <ClientPortalView bookings={bookings} lead={lead} onBack={()=>setView("home")} onBook={()=>setView("home")}/>}
       {view==="dashboard"    && <DashboardView bookings={bookings} leads={leads} onBack={()=>setView("home")}/>}
     </div>
   );
