@@ -545,7 +545,7 @@ function DateTimeView({ service, onConfirm, onBack }) {
 
 // ── Checkout ───────────────────────────────────────────────────────────────
 function CheckoutView({ service, date, slot, onConfirm, onBack, lead }) {
-  const [f, setF] = useState({ name: lead?.name||"", email: lead?.email||"", phone: lead?.phone||"", card:"", exp:"", cvv:"" });
+  const [f, setF] = useState({ name: lead?.name||"", email: lead?.email||"", phone: lead?.phone||"" });
   const [errs, setErrs] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const dateStr = date.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"});
@@ -557,9 +557,6 @@ function CheckoutView({ service, date, slot, onConfirm, onBack, lead }) {
     if(!f.name.trim()) e.name="Required";
     if(!f.email.includes("@")) e.email="Enter a valid email";
     if(f.phone.replace(/\D/g,"").length<10) e.phone="Enter a valid phone number";
-    if(f.card.replace(/\s/g,"").length<16) e.card="Enter a 16-digit card number";
-    if(!f.exp.match(/^\d{2}\/\d{2}$/)) e.exp="MM/YY";
-    if(f.cvv.length<3) e.cvv="3 digits";
     return e;
   }
 
@@ -592,19 +589,12 @@ function CheckoutView({ service, date, slot, onConfirm, onBack, lead }) {
           <FormField id="email" label="Email" placeholder="jane@example.com" type="email" value={f.email} onChange={handleChange} error={errs.email}/>
           <FormField id="phone" label="Phone" placeholder="(352) 555-0100" type="tel" value={f.phone} onChange={handleChange} error={errs.phone}/>
         </div>
-        <h2 style={{fontSize:15,fontWeight:700,color:"#0f172a",marginBottom:8}}>Payment</h2>
-        <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:10,padding:"8px 12px",fontSize:12,color:"#1e40af",marginBottom:12,display:"flex",gap:6}}>
-          🔒 Secure demo checkout — no real charge
-        </div>
-        <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:22}}>
-          <FormField id="card" label="Card Number" placeholder="1234 5678 9012 3456" value={f.card} onChange={handleChange} error={errs.card}/>
-          <div style={{display:"flex",gap:12}}>
-            <FormField id="exp" label="Expiry" placeholder="MM/YY" value={f.exp} onChange={handleChange} error={errs.exp}/>
-            <FormField id="cvv" label="CVV" placeholder="123" value={f.cvv} onChange={handleChange} error={errs.cvv}/>
-          </div>
+        <div style={{background:"#f0fdf4",border:"1px solid #86efac",borderRadius:12,padding:"14px 16px",fontSize:13,marginBottom:22}}>
+          <div style={{fontWeight:700,color:"#15803d",marginBottom:4}}>💸 Payment via Venmo</div>
+          <div style={{color:"#166534"}}>Please send <strong>${service.price}</strong> to <strong>@Jeff-Williams-504</strong> before your session.</div>
         </div>
         <PrimaryBtn full disabled={submitting} onClick={submit}>
-          {submitting ? "Booking & adding to calendar…" : `Pay $${service.price} & Confirm`}
+          {submitting ? "Booking & adding to calendar…" : `Confirm Booking · ${service.price}`}
         </PrimaryBtn>
       </div>
     </div>
@@ -630,8 +620,12 @@ function ConfirmView({ service, date, slot, customer, onHome }) {
           </div>
         ))}
       </div>
-      <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:12,padding:"10px 14px",fontSize:13,color:"#1e40af",display:"flex",gap:8,marginBottom:24,textAlign:"left"}}>
+      <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:12,padding:"10px 14px",fontSize:13,color:"#1e40af",display:"flex",gap:8,marginBottom:16,textAlign:"left"}}>
         📅 This session was added to Jeff's Google Calendar automatically.
+      </div>
+      <div style={{background:"#f0fdf4",border:"1px solid #86efac",borderRadius:12,padding:"14px 16px",fontSize:13,marginBottom:24,textAlign:"left"}}>
+        <div style={{fontWeight:700,color:"#15803d",marginBottom:4}}>💸 Payment via Venmo</div>
+        <div style={{color:"#166534"}}>Please send <strong>${service.price}</strong> to <strong>@Jeff-Williams-504</strong> before your session.</div>
       </div>
       <PrimaryBtn full onClick={onHome}>Book Another Session</PrimaryBtn>
     </div>
