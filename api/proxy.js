@@ -16,7 +16,13 @@ export default async function handler(req, res) {
         headers: { Authorization: `Bearer ${process.env.KV_REST_API_TOKEN}` }
       });
       const d = await r.json();
-      return d.result ? JSON.parse(d.result) : null;
+      if (d.result === null || d.result === undefined) return null;
+      let val = d.result;
+      // Upstash can return double-encoded JSON — parse until it's no longer a string
+      for (let i = 0; i < 3 && typeof val === 'string'; i++) {
+        try { val = JSON.parse(val); } catch { break; }
+      }
+      return val;
     }
 
     async function redisSet(key, value) {
@@ -46,17 +52,18 @@ export default async function handler(req, res) {
     if (action === 'saveBooking') {
       const { booking } = req.body;
       const email = booking.customer.email.toLowerCase();
-      const existing = await redisGet(`bookings:${email}`) || [];
-      existing.push(booking);
-      await redisSet(`bookings:${email}`, existing);
+      const existing = await redisGet(`bookings:${email}`);
+      const list = Array.isArray(existing) ? existing : [];
+      list.push(booking);
+      await redisSet(`bookings:${email}`, list);
       return res.status(200).json({ success: true });
     }
 
     // ── Get bookings ──────────────────────────────────────────────────────
     if (action === 'getBookings') {
       const { email } = req.body;
-      const bookings = await redisGet(`bookings:${email.toLowerCase()}`) || [];
-      return res.status(200).json({ bookings });
+      const bookings = await redisGet(`bookings:${email.toLowerCase()}`);
+      return res.status(200).json({ bookings: Array.isArray(bookings) ? bookings : [] });
     }
 
     // ── Get all leads (admin) ─────────────────────────────────────────────
