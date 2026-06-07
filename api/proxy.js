@@ -10,6 +10,78 @@ export default async function handler(req, res) {
   try {
     const { action } = req.body;
 
+    // ── Redis helpers ─────────────────────────────────────────────────────
+    async function redisGet(key) {
+      const r = await fetch(`${process.env.KV_REST_API_URL}/get/${encodeURIComponent(key)}`, {
+        headers: { Authorization: `Bearer ${process.env.KV_REST_API_TOKEN}` }
+      });
+      const d = await r.json();
+      return d.result ? JSON.parse(d.result) : null;
+    }
+
+    async function redisSet(key, value) {
+      await fetch(`${process.env.KV_REST_API_URL}/set/${encodeURIComponent(key)}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${process.env.KV_REST_API_TOKEN}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: JSON.stringify(value) })
+      });
+    }
+
+    // ── Save lead ─────────────────────────────────────────────────────────
+    if (action === 'saveLead') {
+      const { lead } = req.body;
+      const existing = await redisGet(`lead:${lead.email.toLowerCase()}`);
+      if (!existing) await redisSet(`lead:${lead.email.toLowerCase()}`, lead);
+      return res.status(200).json({ success: true });
+    }
+
+    // ── Get lead ──────────────────────────────────────────────────────────
+    if (action === 'getLead') {
+      const { email } = req.body;
+      const lead = await redisGet(`lead:${email.toLowerCase()}`);
+      return res.status(200).json({ lead });
+    }
+
+    // ── Save booking ──────────────────────────────────────────────────────
+    if (action === 'saveBooking') {
+      const { booking } = req.body;
+      const email = booking.customer.email.toLowerCase();
+      const existing = await redisGet(`bookings:${email}`) || [];
+      existing.push(booking);
+      await redisSet(`bookings:${email}`, existing);
+      return res.status(200).json({ success: true });
+    }
+
+    // ── Get bookings ──────────────────────────────────────────────────────
+    if (action === 'getBookings') {
+      const { email } = req.body;
+      const bookings = await redisGet(`bookings:${email.toLowerCase()}`) || [];
+      return res.status(200).json({ bookings });
+    }
+
+    // ── Get all leads (admin) ─────────────────────────────────────────────
+    if (action === 'getAllLeads') {
+      const r = await fetch(`${process.env.KV_REST_API_URL}/keys/lead:*`, {
+        headers: { Authorization: `Bearer ${process.env.KV_REST_API_TOKEN}` }
+      });
+      const d = await r.json();
+      const keys = d.result || [];
+      const leads = await Promise.all(keys.map(k => redisGet(k)));
+      return res.status(200).json({ leads: leads.filter(Boolean) });
+    }
+
+    // ── Get all bookings (admin) ──────────────────────────────────────────
+    if (action === 'getAllBookings') {
+      const r = await fetch(`${process.env.KV_REST_API_URL}/keys/bookings:*`, {
+        headers: { Authorization: `Bearer ${process.env.KV_REST_API_TOKEN}` }
+      });
+      const d = await r.json();
+      const keys = d.result || [];
+      const all = await Promise.all(keys.map(k => redisGet(k)));
+      const bookings = all.flat().filter(Boolean);
+      return res.status(200).json({ bookings });
+    }
+
     // ── Google Calendar: Get busy times ──────────────────────────────────
     if (action === 'getBusy') {
       const accessToken = await getGoogleAccessToken();
@@ -55,10 +127,7 @@ export default async function handler(req, res) {
       const audienceId = process.env.MAILCHIMP_AUDIENCE_ID;
       const apiKey = process.env.MAILCHIMP_API_KEY;
       const authHeader = 'Basic ' + Buffer.from(`anystring:${apiKey}`).toString('base64');
-
-      // MD5 hash of lowercase email — required by Mailchimp PUT endpoint
       const emailHash = crypto.createHash('md5').update(email.toLowerCase()).digest('hex');
-      console.log('Mailchimp attempt:', { server, audienceId, email, emailHash, tags });
 
       const mcRes = await fetch(
         `https://${server}.api.mailchimp.com/3.0/lists/${audienceId}/members/${emailHash}`,
@@ -69,20 +138,16 @@ export default async function handler(req, res) {
             email_address: email,
             status_if_new: 'subscribed',
             status: 'subscribed',
-            merge_fields: {
-              FNAME: firstName,
-              LNAME: lastName,
-              PHONE: phone || '',
-            },
+            merge_fields: { FNAME: firstName, LNAME: lastName, PHONE: phone || '' },
           }),
         }
       );
       const mcData = await mcRes.json();
-      console.log('Mailchimp upsert response:', JSON.stringify(mcData));
+      console.log('Mailchimp upsert:', JSON.stringify(mcData));
 
-      // Apply tags separately
       if (tags && tags.length > 0) {
-        const tagRes = await fetch(
+        await new Promise(r => setTimeout(r, 1500));
+        await fetch(
           `https://${server}.api.mailchimp.com/3.0/lists/${audienceId}/members/${emailHash}/tags`,
           {
             method: 'POST',
@@ -90,10 +155,8 @@ export default async function handler(req, res) {
             body: JSON.stringify({ tags: tags.map(t => ({ name: t, status: 'active' })) }),
           }
         );
-        console.log('Mailchimp tags status:', tagRes.status);
       }
-
-      return res.status(200).json({ success: true, mailchimp: mcData });
+      return res.status(200).json({ success: true });
     }
 
     // ── Email: Send via Resend ────────────────────────────────────────────
