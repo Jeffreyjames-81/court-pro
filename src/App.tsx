@@ -73,12 +73,44 @@ async function createCalendarEvent(service, dateStr, timeStr, customer) {
       action: "createEvent",
       event: {
         summary: `Tennis – ${service.name} with ${customer.name}`,
-        description: `Client: ${customer.name} | ${customer.email} | ${customer.phone} | $${service.price}`,
+        description: `Client: ${customer.name} | ${customer.email} | ${customer.phone} | ${service.price}`,
         start: { dateTime: `${dateStr}T${timeStr}:00`, timeZone: "America/New_York" },
         end: { dateTime: `${dateStr}T${endStr}:00`, timeZone: "America/New_York" },
       }
     })
   });
+}
+
+async function saveLead(lead) {
+  await fetch("/api/proxy", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ action:"saveLead", lead }) });
+}
+
+async function saveBookingToDb(booking) {
+  await fetch("/api/proxy", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ action:"saveBooking", booking }) });
+}
+
+async function getLeadFromDb(email) {
+  const res = await fetch("/api/proxy", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ action:"getLead", email }) });
+  const data = await res.json();
+  return data.lead;
+}
+
+async function getBookingsFromDb(email) {
+  const res = await fetch("/api/proxy", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ action:"getBookings", email }) });
+  const data = await res.json();
+  return data.bookings || [];
+}
+
+async function getAllLeadsFromDb() {
+  const res = await fetch("/api/proxy", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ action:"getAllLeads" }) });
+  const data = await res.json();
+  return data.leads || [];
+}
+
+async function getAllBookingsFromDb() {
+  const res = await fetch("/api/proxy", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ action:"getAllBookings" }) });
+  const data = await res.json();
+  return data.bookings || [];
 }
 
 function Stars({ r }) {
@@ -126,14 +158,12 @@ function FormSelect({ id, label, options, value, onChange, error }) {
 
 // ── Welcome ────────────────────────────────────────────────────────────────
 function WelcomeView({ onEnter, existingLeads }) {
-  const [mode, setMode] = useState("signup"); // "signup" or "signin"
+  const [mode, setMode] = useState("signup");
   const [f, setF] = useState({ name:"", email:"", phone:"", level:"", goal:"" });
   const [signInEmail, setSignInEmail] = useState("");
   const [errs, setErrs] = useState({});
   const [signInErr, setSignInErr] = useState("");
-
   function handleChange(id, val) { setF(p=>({...p,[id]:val})); }
-
   function validate() {
     const e = {};
     if (!f.name.trim()) e.name = "Required";
@@ -143,22 +173,15 @@ function WelcomeView({ onEnter, existingLeads }) {
     if (!f.goal) e.goal = "Please select";
     return e;
   }
-
   function submit() {
     const e = validate(); setErrs(e);
     if (Object.keys(e).length) return;
     onEnter(f, false);
   }
-
   function signIn() {
-    const found = existingLeads.find(l => l.email.toLowerCase() === signInEmail.toLowerCase().trim());
-    if (!found) {
-      setSignInErr("No account found with that email. Please sign up!");
-      return;
-    }
-    onEnter(found, true);
+    if (!signInEmail.includes("@")) { setSignInErr("Please enter a valid email."); return; }
+    onEnter({ email: signInEmail.trim() }, true);
   }
-
   return (
     <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#1e3a5f 0%,#1d4ed8 100%)",display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}}>
       <div style={{background:"#fff",borderRadius:24,padding:"32px 24px",maxWidth:420,width:"100%",boxShadow:"0 20px 60px rgba(0,0,0,.2)"}}>
@@ -168,20 +191,15 @@ function WelcomeView({ onEnter, existingLeads }) {
           <p style={{fontSize:14,color:"#64748b",margin:0}}>Effective coaching</p>
           <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,marginTop:8}}><Stars r={5}/></div>
         </div>
-
-        {/* Toggle */}
         <div style={{display:"flex",background:"#f1f5f9",borderRadius:12,padding:4,marginBottom:24}}>
           {[["signup","New Client"],["signin","Returning Client"]].map(([m,label])=>(
             <button key={m} onClick={()=>{setMode(m);setErrs({});setSignInErr("");}} style={{
-              flex:1, padding:"8px", borderRadius:10, fontWeight:600, fontSize:13, cursor:"pointer",
-              background: mode===m?"#fff":"transparent",
-              color: mode===m?"#0f172a":"#64748b",
-              border:"none",
-              boxShadow: mode===m?"0 1px 3px rgba(0,0,0,.1)":"none"
+              flex:1,padding:"8px",borderRadius:10,fontWeight:600,fontSize:13,cursor:"pointer",
+              background:mode===m?"#fff":"transparent",color:mode===m?"#0f172a":"#64748b",
+              border:"none",boxShadow:mode===m?"0 1px 3px rgba(0,0,0,.1)":"none"
             }}>{label}</button>
           ))}
         </div>
-
         {mode === "signup" && (
           <>
             <p style={{fontSize:13,color:"#475569",textAlign:"center",marginBottom:20,lineHeight:1.5}}>Tell us a little about yourself to get started!</p>
@@ -193,7 +211,6 @@ function WelcomeView({ onEnter, existingLeads }) {
             <div style={{marginTop:20}}><PrimaryBtn full onClick={submit}>Let's Play →</PrimaryBtn></div>
           </>
         )}
-
         {mode === "signin" && (
           <>
             <p style={{fontSize:13,color:"#475569",textAlign:"center",marginBottom:20,lineHeight:1.5}}>Welcome back! Enter your email to continue.</p>
@@ -243,9 +260,9 @@ function HomeView({ onBook, onClinics, onDashboard, onPortal, lead, isAdmin }) {
         <div style={{display:"flex",gap:8,marginBottom:20}}>
           {[["private","🎾 Private Sessions"],["clinics","👥 Clinics"]].map(([t,label])=>(
             <button key={t} onClick={()=>{setTab(t);setSel(null);}} style={{
-              flex:1, padding:"12px 8px", borderRadius:14, fontWeight:700, fontSize:14, cursor:"pointer",
-              background: tab===t?"#1d4ed8":"#fff", color: tab===t?"#fff":"#64748b",
-              border: tab===t?"none":"2px solid #e2e8f0"
+              flex:1,padding:"12px 8px",borderRadius:14,fontWeight:700,fontSize:14,cursor:"pointer",
+              background:tab===t?"#1d4ed8":"#fff",color:tab===t?"#fff":"#64748b",
+              border:tab===t?"none":"2px solid #e2e8f0"
             }}>{label}</button>
           ))}
         </div>
@@ -255,10 +272,10 @@ function HomeView({ onBook, onClinics, onDashboard, onPortal, lead, isAdmin }) {
             <p style={{fontSize:13,color:"#64748b",marginBottom:14}}>30 min and 60 min sessions available.</p>
             {PRIVATE_SERVICES.map(s => (
               <div key={s.id} onClick={()=>setSel(s)} style={{
-                borderRadius:16, border:`2px solid ${sel?.id===s.id?"#1d4ed8":"#e2e8f0"}`,
-                background: sel?.id===s.id?"#eff6ff":"#fff",
-                padding:"14px 16px", marginBottom:10, cursor:"pointer",
-                display:"flex", justifyContent:"space-between", alignItems:"center"
+                borderRadius:16,border:`2px solid ${sel?.id===s.id?"#1d4ed8":"#e2e8f0"}`,
+                background:sel?.id===s.id?"#eff6ff":"#fff",
+                padding:"14px 16px",marginBottom:10,cursor:"pointer",
+                display:"flex",justifyContent:"space-between",alignItems:"center"
               }}>
                 <div>
                   <div style={{fontWeight:600,fontSize:15,color:"#0f172a"}}>{s.name}</div>
@@ -444,12 +461,11 @@ function DateTimeView({ service, onConfirm, onBack }) {
     const weeks = [];
     for (let i = 1; i <= 7; i++) {
       const nextDate = addDays(selDate, i * 7);
-      const dateStr = fmtDate(nextDate);
-      const busy = await fetchAvailability(dateStr);
+      const busy = await fetchAvailability(fmtDate(nextDate));
       const slotStart = toMins(selSlot.value);
       const slotEnd = slotStart + service.duration;
       const available = !busy.some(b => overlaps(slotStart, slotEnd, toMins(b.start), toMins(b.end)));
-      weeks.push({ date: nextDate, dateStr, available });
+      weeks.push({ date: nextDate, dateStr: fmtDate(nextDate), available });
     }
     setRecurringPreview(weeks);
     setLoadingRecurring(false);
@@ -468,11 +484,11 @@ function DateTimeView({ service, onConfirm, onBack }) {
             const available = (day >= 1 && day <= 4) || day === 5 || day === 6;
             return (
               <button key={fmtDate(d)} onClick={()=>available&&pickDate(d)} style={{
-                flexShrink:0, width:52, padding:"8px 0", borderRadius:14,
+                flexShrink:0,width:52,padding:"8px 0",borderRadius:14,
                 border:`2px solid ${active?"#1d4ed8":"#e2e8f0"}`,
-                background: active?"#1d4ed8":available?"#fff":"#f8fafc",
-                color: active?"#fff":available?"#374151":"#cbd5e1",
-                cursor:available?"pointer":"default", textAlign:"center"
+                background:active?"#1d4ed8":available?"#fff":"#f8fafc",
+                color:active?"#fff":available?"#374151":"#cbd5e1",
+                cursor:available?"pointer":"default",textAlign:"center"
               }}>
                 <div style={{fontSize:10,fontWeight:600,opacity:.8}}>{d.toLocaleDateString("en-US",{weekday:"short"})}</div>
                 <div style={{fontSize:20,fontWeight:800,lineHeight:1.2}}>{d.getDate()}</div>
@@ -495,27 +511,23 @@ function DateTimeView({ service, onConfirm, onBack }) {
                   <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:20}}>
                     {slots.map(s=>(
                       <button key={s.value} onClick={()=>setSelSlot(s)} style={{
-                        padding:"10px 4px", borderRadius:12, fontSize:13, fontWeight:600, cursor:"pointer",
+                        padding:"10px 4px",borderRadius:12,fontSize:13,fontWeight:600,cursor:"pointer",
                         border:`2px solid ${selSlot?.value===s.value?"#1d4ed8":"#e2e8f0"}`,
-                        background: selSlot?.value===s.value?"#1d4ed8":"#fff",
-                        color: selSlot?.value===s.value?"#fff":"#374151"
+                        background:selSlot?.value===s.value?"#1d4ed8":"#fff",
+                        color:selSlot?.value===s.value?"#fff":"#374151"
                       }}>{s.label}</button>
                     ))}
                   </div>
-
                   {selSlot && (
                     <div style={{background:"#f8fafc",borderRadius:16,padding:"16px",marginBottom:20,border:"1px solid #e2e8f0"}}>
                       <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}}>
-                        <input type="checkbox" checked={recurring} onChange={e=>handleRecurringToggle(e.target.checked)}
-                          style={{width:18,height:18,cursor:"pointer"}}/>
+                        <input type="checkbox" checked={recurring} onChange={e=>handleRecurringToggle(e.target.checked)} style={{width:18,height:18,cursor:"pointer"}}/>
                         <div>
                           <div style={{fontWeight:700,fontSize:14,color:"#0f172a"}}>Make this a weekly recurring session</div>
                           <div style={{fontSize:12,color:"#64748b"}}>Books the same time every week for 8 weeks</div>
                         </div>
                       </label>
-
                       {loadingRecurring && <p style={{fontSize:13,color:"#94a3b8",marginTop:12}}>Checking weekly availability…</p>}
-
                       {!loadingRecurring && recurringPreview.length > 0 && (
                         <div style={{marginTop:12}}>
                           <div style={{fontSize:12,fontWeight:600,color:"#374151",marginBottom:8}}>Weekly schedule preview:</div>
@@ -614,7 +626,7 @@ function ConfirmView({ service, date, slot, customer, recurring, bookedDates, on
       <h1 style={{fontSize:26,fontWeight:800,color:"#0f172a",marginBottom:6}}>
         {recurring ? "Weekly sessions booked!" : "You're booked!"}
       </h1>
-      <p style={{color:"#64748b",marginBottom:24}}>See you on the court! All sessions have been added to the calendar.</p>
+      <p style={{color:"#64748b",marginBottom:24}}>See you on the court!</p>
       <div style={{background:"#f0fdf4",border:"1px solid #86efac",borderRadius:20,padding:"20px",textAlign:"left",marginBottom:16}}>
         <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
           <span style={{fontSize:18}}>✅</span>
@@ -625,11 +637,7 @@ function ConfirmView({ service, date, slot, customer, recurring, bookedDates, on
             <span style={{color:"#64748b"}}>{k}</span><span style={{fontWeight:600,color:"#0f172a"}}>{v}</span>
           </div>
         ))}
-        {recurring && bookedDates && (
-          <div style={{marginTop:8,fontSize:12,color:"#15803d",fontWeight:600}}>
-            🔄 {bookedDates.length} weekly sessions booked
-          </div>
-        )}
+        {recurring && bookedDates && <div style={{marginTop:8,fontSize:12,color:"#15803d",fontWeight:600}}>🔄 {bookedDates.length} weekly sessions booked</div>}
       </div>
       <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:12,padding:"10px 14px",fontSize:13,color:"#1e40af",display:"flex",gap:8,marginBottom:16,textAlign:"left"}}>
         📅 Sessions added to Jeff's Google Calendar automatically.
@@ -643,70 +651,216 @@ function ConfirmView({ service, date, slot, customer, recurring, bookedDates, on
 }
 
 // ── Client Portal ──────────────────────────────────────────────────────────
-function ClientPortalView({ bookings, lead, onBack }) {
-  const myBookings = bookings.filter(b => b.customer.email === lead?.email);
-  const upcoming = myBookings.filter(b => new Date(b.date) >= new Date()).sort((a,b) => new Date(a.date) - new Date(b.date));
-  const past = myBookings.filter(b => new Date(b.date) < new Date()).sort((a,b) => new Date(b.date) - new Date(a.date));
+function ClientPortalView({ bookings, lead, onBack, onBook }) {
+  const myBookings = bookings.filter(b => b.customer?.email === lead?.email);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const upcoming = myBookings.filter(b => new Date(b.date) >= today).sort((a,b) => new Date(a.date) - new Date(b.date));
+  const past = myBookings.filter(b => new Date(b.date) < today).sort((a,b) => new Date(b.date) - new Date(a.date));
 
-  function cancelSession(booking) {
-    fetch("/api/proxy", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "sendEmail",
-        to: "jwlegacyrealty@gmail.com",
-        subject: `Session Cancellation Request — ${booking.customer.name}`,
-        body: `${booking.customer.name} has requested to cancel their session.\n\nSession: ${booking.service.name}\nDate: ${new Date(booking.date).toLocaleDateString()}\nTime: ${booking.slot.label}\nEmail: ${booking.customer.email}\nPhone: ${booking.customer.phone}`
-      })
-    });
-    alert("Cancellation request sent! Jeff will confirm via email.");
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [selectedDay, setSelectedDay] = useState(null);
+  const [daySlots, setDaySlots] = useState([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [tab, setTab] = useState("calendar");
+
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const calDays = [];
+  for (let i = 0; i < firstDay; i++) calDays.push(null);
+  for (let i = 1; i <= daysInMonth; i++) calDays.push(new Date(year, month, i));
+
+  function isTeachingDay(d) {
+    if (!d) return false;
+    const day = d.getDay();
+    return (day >= 1 && day <= 4) || day === 5 || day === 6;
+  }
+  function hasBooking(d) {
+    if (!d) return false;
+    return myBookings.some(b => new Date(b.date).toDateString() === d.toDateString());
+  }
+  function isPastDay(d) { return d && d < today; }
+  function isToday(d) { return d && d.toDateString() === today.toDateString(); }
+
+  async function selectDay(d) {
+    if (!d || isPastDay(d) || !isTeachingDay(d)) return;
+    setSelectedDay(d);
+    setLoadingSlots(true);
+    try {
+      const busy = await fetchAvailability(fmtDate(d));
+      const all = generateSlots(60, d);
+      setDaySlots(all.filter(sl => {
+        const s=toMins(sl.value), e=s+60;
+        return !busy.some(b=>overlaps(s,e,toMins(b.start),toMins(b.end)));
+      }));
+    } catch { setDaySlots(generateSlots(60, d)); }
+    setLoadingSlots(false);
   }
 
+  function cancelSession(booking) {
+    fetch("/api/proxy", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ action:"sendEmail", to:"jwlegacyrealty@gmail.com", subject:`Cancellation Request — ${booking.customer.name}`, body:`${booking.customer.name} wants to cancel:\n\nSession: ${booking.service.name}\nDate: ${new Date(booking.date).toLocaleDateString()}\nTime: ${booking.slot.label}\nEmail: ${booking.customer.email}` }) });
+    alert("Cancellation request sent to Jeff!");
+  }
+
+  const monthName = currentMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const selectedBooking = selectedDay && myBookings.find(b => new Date(b.date).toDateString() === selectedDay.toDateString());
+
   return (
-    <div style={{maxWidth:580,margin:"0 auto"}}>
-      <BackBtn onClick={onBack}/>
-      <div style={{padding:"0 20px 32px"}}>
-        <h1 style={{fontSize:22,fontWeight:800,color:"#0f172a",marginBottom:4}}>My Sessions</h1>
-        {lead?.name && <p style={{fontSize:13,color:"#64748b",marginBottom:20}}>{lead.name} · {lead.email}</p>}
-
-        <h2 style={{fontSize:15,fontWeight:700,color:"#0f172a",marginBottom:12}}>Upcoming</h2>
-        {upcoming.length === 0
-          ? <div style={{background:"#f8fafc",borderRadius:16,padding:"24px",textAlign:"center",color:"#94a3b8",marginBottom:20}}>
-              <div style={{fontSize:32,marginBottom:8}}>📅</div>
-              <p style={{margin:0,fontSize:14}}>No upcoming sessions. Book one below!</p>
+    <div style={{maxWidth:580,margin:"0 auto",minHeight:"100vh",background:"#f8fafc"}}>
+      <div style={{background:"linear-gradient(135deg,#1e3a5f 0%,#1d4ed8 100%)",padding:"24px 20px 20px",color:"#fff"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
+          <div>
+            <div style={{fontSize:28,marginBottom:2}}>🎾</div>
+            <h1 style={{fontSize:20,fontWeight:800,margin:"0 0 2px"}}>My Sessions</h1>
+            {lead?.name && <p style={{opacity:.8,margin:0,fontSize:13}}>{lead.name.split(" ")[0]}'s portal</p>}
+          </div>
+          <button onClick={onBook} style={{background:"#fff",color:"#1d4ed8",border:"none",borderRadius:12,padding:"10px 16px",fontSize:13,fontWeight:700,cursor:"pointer"}}>+ Book Session</button>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+          {[["📅",upcoming.length,"Upcoming"],["✅",past.length,"Completed"]].map(([icon,val,label])=>(
+            <div key={label} style={{background:"rgba(255,255,255,.15)",borderRadius:12,padding:"10px 8px",textAlign:"center"}}>
+              <div style={{fontSize:18}}>{icon}</div>
+              <div style={{fontSize:20,fontWeight:800,lineHeight:1.2}}>{val}</div>
+              <div style={{fontSize:10,opacity:.8}}>{label}</div>
             </div>
-          : upcoming.map((b,i) => (
-            <div key={i} style={{background:"#fff",border:"2px solid #e2e8f0",borderRadius:16,padding:"16px",marginBottom:12}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                <div>
-                  <div style={{fontWeight:700,fontSize:15,color:"#0f172a"}}>{b.service.name}</div>
-                  <div style={{fontSize:13,color:"#64748b",marginTop:2}}>{new Date(b.date).toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}</div>
-                  <div style={{fontSize:13,color:"#64748b"}}>{b.slot.label} · {b.service.duration} min</div>
-                  <div style={{fontSize:13,color:"#1d4ed8",fontWeight:600,marginTop:4}}>${b.service.price} via Venmo @Jeff-Williams-504</div>
-                </div>
-                <button onClick={()=>cancelSession(b)} style={{background:"#fef2f2",border:"1px solid #fecaca",color:"#dc2626",borderRadius:10,padding:"6px 12px",fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ))
-        }
+          ))}
+        </div>
+      </div>
 
-        {past.length > 0 && (
+      <div style={{display:"flex",background:"#fff",borderBottom:"2px solid #e2e8f0"}}>
+        {[["calendar","📅 Calendar"],["sessions","📋 My Bookings"]].map(([t,label])=>(
+          <button key={t} onClick={()=>setTab(t)} style={{
+            flex:1,padding:"14px 8px",fontWeight:700,fontSize:13,cursor:"pointer",
+            background:"transparent",border:"none",
+            color:tab===t?"#1d4ed8":"#64748b",
+            borderBottom:tab===t?"3px solid #1d4ed8":"3px solid transparent"
+          }}>{label}</button>
+        ))}
+      </div>
+
+      <div style={{padding:"16px 20px 32px"}}>
+        {tab === "calendar" && (
           <>
-            <h2 style={{fontSize:15,fontWeight:700,color:"#0f172a",marginBottom:12,marginTop:8}}>Past Sessions</h2>
-            {past.map((b,i) => (
-              <div key={i} style={{background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:16,padding:"16px",marginBottom:12,opacity:.7}}>
-                <div style={{fontWeight:600,fontSize:14,color:"#374151"}}>{b.service.name}</div>
-                <div style={{fontSize:13,color:"#94a3b8"}}>{new Date(b.date).toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})} · {b.slot.label}</div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+              <button onClick={()=>setCurrentMonth(new Date(year,month-1,1))} style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:10,padding:"8px 14px",cursor:"pointer",fontSize:18,color:"#374151"}}>‹</button>
+              <span style={{fontWeight:700,fontSize:16,color:"#0f172a"}}>{monthName}</span>
+              <button onClick={()=>setCurrentMonth(new Date(year,month+1,1))} style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:10,padding:"8px 14px",cursor:"pointer",fontSize:18,color:"#374151"}}>›</button>
+            </div>
+
+            <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:6}}>
+              {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=>(
+                <div key={d} style={{textAlign:"center",fontSize:10,fontWeight:700,color:"#94a3b8",padding:"4px 0"}}>{d}</div>
+              ))}
+            </div>
+
+            <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4,marginBottom:20}}>
+              {calDays.map((d,i) => {
+                if (!d) return <div key={`e-${i}`}/>;
+                const teaching = isTeachingDay(d);
+                const booked = hasBooking(d);
+                const pastD = isPastDay(d);
+                const todayD = isToday(d);
+                const selected = selectedDay && d.toDateString() === selectedDay.toDateString();
+                return (
+                  <button key={i} onClick={()=>selectDay(d)} style={{
+                    aspectRatio:"1",borderRadius:10,border:"none",
+                    cursor:teaching&&!pastD?"pointer":"default",
+                    display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+                    background:selected?"#1d4ed8":booked?"#dbeafe":todayD?"#eff6ff":teaching&&!pastD?"#fff":"transparent",
+                    color:selected?"#fff":booked?"#1d4ed8":pastD?"#d1d5db":"#374151",
+                    fontWeight:todayD||booked||selected?700:400,
+                    fontSize:13,
+                    boxShadow:selected?"0 2px 8px rgba(29,78,216,.4)":booked?"0 1px 3px rgba(29,78,216,.15)":teaching&&!pastD?"0 1px 2px rgba(0,0,0,.06)":"none",
+                    outline:todayD&&!selected?"2px solid #1d4ed8":"none",
+                    outlineOffset:"-2px"
+                  }}>
+                    {d.getDate()}
+                    {booked && !selected && <div style={{width:4,height:4,borderRadius:"50%",background:"#1d4ed8",marginTop:1}}/>}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div style={{display:"flex",gap:12,marginBottom:16,fontSize:11,color:"#64748b",flexWrap:"wrap"}}>
+              <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:12,height:12,borderRadius:3,background:"#fff",border:"1px solid #e2e8f0",display:"inline-block"}}/> Available</span>
+              <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:12,height:12,borderRadius:3,background:"#dbeafe",display:"inline-block"}}/> Your booking</span>
+              <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:12,height:12,borderRadius:3,background:"#1d4ed8",display:"inline-block"}}/> Selected</span>
+            </div>
+
+            {selectedDay ? (
+              <div style={{background:"#fff",borderRadius:16,border:"1px solid #e2e8f0",padding:"16px"}}>
+                <h3 style={{fontSize:14,fontWeight:700,color:"#0f172a",marginBottom:12}}>
+                  {selectedDay.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}
+                </h3>
+                {selectedBooking ? (
+                  <div style={{background:"#eff6ff",borderRadius:12,padding:"14px",marginBottom:12}}>
+                    <div style={{fontWeight:700,color:"#1d4ed8",fontSize:14,marginBottom:4}}>{selectedBooking.service.name}</div>
+                    <div style={{fontSize:13,color:"#3b82f6"}}>{selectedBooking.slot.label} · {selectedBooking.service.duration} min</div>
+                    <div style={{fontSize:12,color:"#64748b",marginTop:4}}>${selectedBooking.service.price} via Venmo @Jeff-Williams-504</div>
+                    <button onClick={()=>cancelSession(selectedBooking)} style={{marginTop:10,background:"#fef2f2",border:"1px solid #fecaca",color:"#dc2626",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>Request Cancellation</button>
+                  </div>
+                ) : loadingSlots ? (
+                  <p style={{fontSize:13,color:"#94a3b8",textAlign:"center",padding:"8px 0"}}>Checking availability…</p>
+                ) : daySlots.length === 0 ? (
+                  <p style={{fontSize:13,color:"#94a3b8"}}>No open slots this day. Try another day!</p>
+                ) : (
+                  <>
+                    <p style={{fontSize:12,color:"#64748b",marginBottom:10}}>Open times — tap Book Session to reserve:</p>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:14}}>
+                      {daySlots.map(s=>(
+                        <span key={s.value} style={{background:"#f0fdf4",color:"#15803d",fontSize:13,fontWeight:600,padding:"6px 14px",borderRadius:20,border:"1px solid #86efac"}}>{s.label}</span>
+                      ))}
+                    </div>
+                    <PrimaryBtn full onClick={onBook}>Book This Day →</PrimaryBtn>
+                  </>
+                )}
               </div>
-            ))}
+            ) : (
+              <div style={{background:"#fff",borderRadius:16,border:"1px dashed #e2e8f0",padding:"24px",textAlign:"center",color:"#94a3b8"}}>
+                <div style={{fontSize:32,marginBottom:8}}>👆</div>
+                <p style={{margin:0,fontSize:13}}>Tap any day to see availability or your booking details</p>
+              </div>
+            )}
           </>
         )}
 
-        <div style={{marginTop:16}}>
-          <PrimaryBtn full onClick={onBack}>Book Another Session</PrimaryBtn>
-        </div>
+        {tab === "sessions" && (
+          <>
+            <h2 style={{fontSize:15,fontWeight:700,color:"#0f172a",marginBottom:12}}>Upcoming</h2>
+            {upcoming.length === 0
+              ? <div style={{background:"#fff",borderRadius:16,padding:"32px",textAlign:"center",color:"#94a3b8",marginBottom:16}}>
+                  <div style={{fontSize:36,marginBottom:8}}>📅</div>
+                  <p style={{margin:"0 0 16px",fontSize:14}}>No upcoming sessions.</p>
+                  <PrimaryBtn onClick={onBook}>Book a Session →</PrimaryBtn>
+                </div>
+              : upcoming.map((b,i) => (
+                <div key={i} style={{background:"#fff",border:"2px solid #e2e8f0",borderRadius:16,padding:"16px",marginBottom:12}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                    <div>
+                      <div style={{fontWeight:700,fontSize:15,color:"#0f172a"}}>{b.service.name}</div>
+                      <div style={{fontSize:13,color:"#64748b",marginTop:2}}>{new Date(b.date).toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}</div>
+                      <div style={{fontSize:13,color:"#64748b"}}>{b.slot.label} · {b.service.duration} min</div>
+                      <div style={{fontSize:12,color:"#1d4ed8",fontWeight:600,marginTop:4}}>${b.service.price} · Venmo @Jeff-Williams-504</div>
+                    </div>
+                    <button onClick={()=>cancelSession(b)} style={{background:"#fef2f2",border:"1px solid #fecaca",color:"#dc2626",borderRadius:10,padding:"6px 12px",fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0,marginLeft:8}}>Cancel</button>
+                  </div>
+                </div>
+              ))
+            }
+            {past.length > 0 && (
+              <>
+                <h2 style={{fontSize:15,fontWeight:700,color:"#0f172a",marginBottom:12,marginTop:16}}>Past Sessions</h2>
+                {past.map((b,i) => (
+                  <div key={i} style={{background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:16,padding:"16px",marginBottom:10,opacity:.7}}>
+                    <div style={{fontWeight:600,fontSize:14,color:"#374151"}}>{b.service.name}</div>
+                    <div style={{fontSize:13,color:"#94a3b8"}}>{new Date(b.date).toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})} · {b.slot.label}</div>
+                  </div>
+                ))}
+              </>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
@@ -739,7 +893,7 @@ function DashboardView({ bookings, leads, onBack }) {
           {["bookings","clients"].map(t=>(
             <button key={t} onClick={()=>setTab(t)} style={{
               padding:"8px 20px",borderRadius:20,fontWeight:600,fontSize:13,cursor:"pointer",
-              background:tab===t?"#1d4ed8":"#fff", color:tab===t?"#fff":"#64748b",
+              background:tab===t?"#1d4ed8":"#fff",color:tab===t?"#fff":"#64748b",
               border:tab===t?"none":"1px solid #e2e8f0"
             }}>{t==="bookings"?"Bookings":"Clients"}</button>
           ))}
@@ -771,7 +925,7 @@ function DashboardView({ bookings, leads, onBack }) {
                 <div style={{display:"flex",gap:8,marginTop:6}}>
                   <span style={{background:"#eff6ff",color:"#1d4ed8",fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:20}}>{l.level}</span>
                   <span style={{background:"#f0fdf4",color:"#15803d",fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:20}}>{l.goal}</span>
-                  <span style={{background:"#f8fafc",color:"#64748b",fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:20}}>{bookings.filter(b=>b.customer.email===l.email).length} sessions</span>
+                  <span style={{background:"#f8fafc",color:"#64748b",fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:20}}>{bookings.filter(b=>b.customer?.email===l.email).length} sessions</span>
                 </div>
               </div>
             ))
@@ -792,37 +946,59 @@ export default function App() {
   const [recurring, setRecurring] = useState(false);
   const [recurringDates, setRecurringDates] = useState([]);
   const [customer, setCustomer] = useState(null);
-  const [bookings, setBookings] = useState(() => { try { return JSON.parse(localStorage.getItem("cp_bookings")||"[]"); } catch { return []; } });
-  const [leads, setLeads] = useState(() => { try { return JSON.parse(localStorage.getItem("cp_leads")||"[]"); } catch { return []; } });
+  const [bookings, setBookings] = useState([]);
+  const [leads, setLeads] = useState([]);
   const [selectedClinic, setSelectedClinic] = useState(null);
-
-  function saveLeads(newLeads) { setLeads(newLeads); try { localStorage.setItem("cp_leads", JSON.stringify(newLeads)); } catch {} }
-  function saveBookings(newBookings) { setBookings(newBookings); try { localStorage.setItem("cp_bookings", JSON.stringify(newBookings)); } catch {} }
+  const [loadingPortal, setLoadingPortal] = useState(false);
 
   async function handleEnter(info, isReturning) {
-    setLead(info);
-    if (!isReturning) {
-      const existing = leads.find(l => l.email.toLowerCase() === info.email.toLowerCase());
-      if (!existing) {
-        saveLeads([...leads, info]);
-        fetch("/api/proxy", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ action:"addToMailchimp", name:info.name, email:info.email, phone:info.phone, level:info.level, goal:info.goal, tags:["Tennis"] }) });
+    if (isReturning) {
+      // Sign in — look up from Redis
+      setLoadingPortal(true);
+      const dbLead = await getLeadFromDb(info.email);
+      if (!dbLead) {
+        alert("No account found with that email. Please sign up!");
+        setLoadingPortal(false);
+        return;
       }
+      const dbBookings = await getBookingsFromDb(info.email);
+      setLead(dbLead);
+      setBookings(dbBookings);
+      setLoadingPortal(false);
+      setView("portal");
+    } else {
+      // Sign up — save to Redis
+      setLead(info);
+      await saveLead(info);
+      fetch("/api/proxy", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ action:"addToMailchimp", name:info.name, email:info.email, phone:info.phone, level:info.level, goal:info.goal, tags:["Tennis"] }) });
+      setView("portal");
     }
-    setView("portal");
   }
 
   async function handleCheckout(customerInfo) {
     await createCalendarEvent(service, fmtDate(date), slot.value, customerInfo);
-    const allNewBookings = [{ service, date: fmtDate(date), slot, customer: customerInfo }];
+    const newBooking = { service, date: fmtDate(date), slot, customer: customerInfo };
+    await saveBookingToDb(newBooking);
+    const allNew = [newBooking];
+
     if (recurring && recurringDates.length > 0) {
       for (const w of recurringDates.filter(w => w.available)) {
         await createCalendarEvent(service, w.dateStr, slot.value, customerInfo);
-        allNewBookings.push({ service, date: w.dateStr, slot, customer: customerInfo });
+        const rb = { service, date: w.dateStr, slot, customer: customerInfo };
+        await saveBookingToDb(rb);
+        allNew.push(rb);
       }
     }
     setCustomer(customerInfo);
-    saveBookings([...bookings, ...allNewBookings]);
+    setBookings(b => [...b, ...allNew]);
     setView("confirm");
+  }
+
+  async function loadDashboard() {
+    setView("dashboard");
+    const [allLeads, allBookings] = await Promise.all([getAllLeadsFromDb(), getAllBookingsFromDb()]);
+    setLeads(allLeads);
+    setBookings(allBookings);
   }
 
   function handleClinicAction(clinic) {
@@ -834,15 +1010,16 @@ export default function App() {
 
   return (
     <div style={{minHeight:"100vh",background:"#f8fafc",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
-      {view==="welcome"      && <WelcomeView onEnter={handleEnter} existingLeads={leads}/>}
-      {view==="home"         && <HomeView onBook={s=>{setService(s);setView("datetime");}} onClinics={handleClinicAction} onDashboard={()=>setView("dashboard")} onPortal={()=>setView("portal")} lead={lead} isAdmin={isAdmin}/>}
-      {view==="clinicsignup" && <ClinicSignUpView clinic={selectedClinic} onBack={()=>setView("home")} lead={lead}/>}
-      {view==="requestinvite"&& <RequestInviteView clinic={selectedClinic} onBack={()=>setView("home")} lead={lead}/>}
-      {view==="datetime"     && <DateTimeView service={service} onConfirm={(d,s,r,rd)=>{setDate(d);setSlot(s);setRecurring(r);setRecurringDates(rd||[]);setView("checkout");}} onBack={()=>setView("home")}/>}
-      {view==="checkout"     && <CheckoutView service={service} date={date} slot={slot} recurring={recurring} recurringDates={recurringDates} onConfirm={handleCheckout} onBack={()=>setView("datetime")} lead={lead}/>}
-      {view==="confirm"      && <ConfirmView service={service} date={date} slot={slot} customer={customer} recurring={recurring} bookedDates={recurringDates?.filter(w=>w.available)} onHome={reset} onPortal={()=>setView("portal")}/>}
-      {view==="portal"       && <ClientPortalView bookings={bookings} lead={lead} onBack={()=>setView("home")} onBook={()=>setView("home")}/>}
-      {view==="dashboard"    && <DashboardView bookings={bookings} leads={leads} onBack={()=>setView("home")}/>}
+      {loadingPortal && <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"linear-gradient(135deg,#1e3a5f,#1d4ed8"}}><div style={{color:"#fff",textAlign:"center"}}><div style={{fontSize:48,marginBottom:16}}>🎾</div><p style={{fontSize:16,fontWeight:600}}>Loading your sessions…</p></div></div>}
+      {!loadingPortal && view==="welcome"       && <WelcomeView onEnter={handleEnter} existingLeads={leads}/>}
+      {!loadingPortal && view==="home"          && <HomeView onBook={s=>{setService(s);setView("datetime");}} onClinics={handleClinicAction} onDashboard={loadDashboard} onPortal={()=>setView("portal")} lead={lead} isAdmin={isAdmin}/>}
+      {!loadingPortal && view==="clinicsignup"  && <ClinicSignUpView clinic={selectedClinic} onBack={()=>setView("home")} lead={lead}/>}
+      {!loadingPortal && view==="requestinvite" && <RequestInviteView clinic={selectedClinic} onBack={()=>setView("home")} lead={lead}/>}
+      {!loadingPortal && view==="datetime"      && <DateTimeView service={service} onConfirm={(d,s,r,rd)=>{setDate(d);setSlot(s);setRecurring(r);setRecurringDates(rd||[]);setView("checkout");}} onBack={()=>setView("home")}/>}
+      {!loadingPortal && view==="checkout"      && <CheckoutView service={service} date={date} slot={slot} recurring={recurring} recurringDates={recurringDates} onConfirm={handleCheckout} onBack={()=>setView("datetime")} lead={lead}/>}
+      {!loadingPortal && view==="confirm"       && <ConfirmView service={service} date={date} slot={slot} customer={customer} recurring={recurring} bookedDates={recurringDates?.filter(w=>w.available)} onHome={reset} onPortal={()=>setView("portal")}/>}
+      {!loadingPortal && view==="portal"        && <ClientPortalView bookings={bookings} lead={lead} onBack={()=>setView("home")} onBook={()=>setView("home")}/>}
+      {!loadingPortal && view==="dashboard"     && <DashboardView bookings={bookings} leads={leads} onBack={()=>setView("home")}/>}
     </div>
   );
 }
