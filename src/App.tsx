@@ -6,7 +6,7 @@ const COACH = {
   location: "Ocala, FL",
   avatar: "JW",
   color: "#1d4ed8",
-  bio: "USPTA certified tennis pro with 15 years of teaching experience. Rated 4.5 and passionate about competitive development — Jeff has coached multiple students to ITF Gold achievements.",
+  bio: "USPTR certified tennis pro with 15 years of teaching experience. Rated 4.5 and passionate about competitive development — Jeff has coached a student to an ITF Gold achievement.",
   rating: 5.0,
 };
 
@@ -605,10 +605,6 @@ function CheckoutView({ service, date, slot, recurring, recurringDates, onConfir
           <FormField id="email" label="Email" placeholder="jane@example.com" type="email" value={f.email} onChange={handleChange} error={errs.email}/>
           <FormField id="phone" label="Phone" placeholder="(352) 555-0100" type="tel" value={f.phone} onChange={handleChange} error={errs.phone}/>
         </div>
-        <div style={{background:"#f0fdf4",border:"1px solid #86efac",borderRadius:12,padding:"14px 16px",fontSize:13,marginBottom:22}}>
-          <div style={{fontWeight:700,color:"#15803d",marginBottom:4}}>💸 Payment via Venmo</div>
-          <div style={{color:"#166534"}}>Please send <strong>${service.price}</strong> per session to <strong>@Jeff-Williams-504</strong> before each session.</div>
-        </div>
         <PrimaryBtn full disabled={submitting} onClick={submit}>
           {submitting ? "Booking & adding to calendar…" : "Confirm Booking"}
         </PrimaryBtn>
@@ -797,7 +793,6 @@ function ClientPortalView({ bookings, lead, onBack, onBook }) {
                   <div style={{background:"#eff6ff",borderRadius:12,padding:"14px",marginBottom:12}}>
                     <div style={{fontWeight:700,color:"#1d4ed8",fontSize:14,marginBottom:4}}>{selectedBooking.service.name}</div>
                     <div style={{fontSize:13,color:"#3b82f6"}}>{selectedBooking.slot.label} · {selectedBooking.service.duration} min</div>
-                    <div style={{fontSize:12,color:"#64748b",marginTop:4}}>${selectedBooking.service.price} via Venmo @Jeff-Williams-504</div>
                     <button onClick={()=>cancelSession(selectedBooking)} style={{marginTop:10,background:"#fef2f2",border:"1px solid #fecaca",color:"#dc2626",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>Request Cancellation</button>
                   </div>
                 ) : loadingSlots ? (
@@ -841,7 +836,6 @@ function ClientPortalView({ bookings, lead, onBack, onBook }) {
                       <div style={{fontWeight:700,fontSize:15,color:"#0f172a"}}>{b.service.name}</div>
                       <div style={{fontSize:13,color:"#64748b",marginTop:2}}>{new Date(b.date).toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}</div>
                       <div style={{fontSize:13,color:"#64748b"}}>{b.slot.label} · {b.service.duration} min</div>
-                      <div style={{fontSize:12,color:"#1d4ed8",fontWeight:600,marginTop:4}}>${b.service.price} · Venmo @Jeff-Williams-504</div>
                     </div>
                     <button onClick={()=>cancelSession(b)} style={{background:"#fef2f2",border:"1px solid #fecaca",color:"#dc2626",borderRadius:10,padding:"6px 12px",fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0,marginLeft:8}}>Cancel</button>
                   </div>
