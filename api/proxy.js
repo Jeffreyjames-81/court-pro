@@ -18,18 +18,30 @@ export default async function handler(req, res) {
       const d = await r.json();
       if (d.result === null || d.result === undefined) return null;
       let val = d.result;
-      // Upstash can return double-encoded JSON — parse until it's no longer a string
-      for (let i = 0; i < 3 && typeof val === 'string'; i++) {
+      // Parse repeatedly: Upstash may return double-encoded JSON strings
+      for (let i = 0; i < 5 && typeof val === 'string'; i++) {
         try { val = JSON.parse(val); } catch { break; }
+      }
+      // Unwrap legacy { value: ... } wrapper if present, then parse again
+      for (let i = 0; i < 5; i++) {
+        if (val && typeof val === 'object' && !Array.isArray(val) && 'value' in val && Object.keys(val).length === 1) {
+          val = val.value;
+          while (typeof val === 'string') {
+            try { val = JSON.parse(val); } catch { break; }
+          }
+        } else {
+          break;
+        }
       }
       return val;
     }
 
     async function redisSet(key, value) {
+      // Store as a single JSON string via the path form so reads round-trip cleanly
       await fetch(`${process.env.KV_REST_API_URL}/set/${encodeURIComponent(key)}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${process.env.KV_REST_API_TOKEN}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: JSON.stringify(value) })
+        body: JSON.stringify(value)
       });
     }
 
