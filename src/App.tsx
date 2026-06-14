@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const COACH = {
   name: "Jeff Williams",
@@ -934,6 +934,29 @@ function DashboardView({ bookings, leads, onBack }) {
 export default function App() {
   const isAdmin = window.location.search.includes("admin=courtpro2024");
   const [view, setView] = useState("welcome");
+
+  // ── Browser back-button support ──────────────────────────────────────────
+  // Push a history entry each time the view changes, and listen for the
+  // browser Back button to step back through app screens instead of leaving.
+  useEffect(() => {
+    window.history.replaceState({ view: "welcome" }, "");
+  }, []);
+
+  useEffect(() => {
+    const current = window.history.state?.view;
+    if (current !== view) {
+      window.history.pushState({ view }, "");
+    }
+  }, [view]);
+
+  useEffect(() => {
+    function onPop(e) {
+      const prev = e.state?.view || "welcome";
+      setView(prev);
+    }
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
   const [lead, setLead] = useState(null);
   const [service, setService] = useState(null);
   const [date, setDate] = useState(null);
