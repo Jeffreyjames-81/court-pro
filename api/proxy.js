@@ -134,7 +134,30 @@ export default async function handler(req, res) {
         `New Booking — ${event.summary}`,
         `A new session has been booked!\n\n${event.description}\n\nDate/Time: ${event.start.dateTime}\n\nThis has been added to your Google Calendar automatically.`
       );
-      return res.status(200).json(calData);
+      return res.status(200).json({ ...calData, eventId: calData.id });
+    }
+
+    // ── Google Calendar: Delete event ────────────────────────────────────
+    if (action === 'deleteEvent') {
+      const { eventId } = req.body;
+      if (!eventId) return res.status(200).json({ success: false, reason: 'no eventId' });
+      const accessToken = await getGoogleAccessToken();
+      await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+      });
+      return res.status(200).json({ success: true });
+    }
+
+    // ── Delete a booking from Redis ──────────────────────────────────────
+    if (action === 'deleteBooking') {
+      const { email, date, slotValue } = req.body;
+      const key = `bookings:${email.toLowerCase()}`;
+      const existing = await redisGet(key);
+      const list = Array.isArray(existing) ? existing : [];
+      const filtered = list.filter(b => !(b.date === date && b.slot?.value === slotValue));
+      await redisSet(key, filtered);
+      return res.status(200).json({ success: true, remaining: filtered.length });
     }
 
     // ── Mailchimp: Add/update contact ─────────────────────────────────────
