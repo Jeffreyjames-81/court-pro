@@ -90,13 +90,13 @@ async function saveBookingToDb(booking) {
 }
 
 async function getLeadFromDb(email) {
-  const res = await fetch("/api/proxy", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ action:"getLead", email }) });
+  const res = await fetch("/api/proxy", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ action:"getLead", email: (email||"").toLowerCase() }) });
   const data = await res.json();
   return data.lead;
 }
 
 async function getBookingsFromDb(email) {
-  const res = await fetch("/api/proxy", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ action:"getBookings", email }) });
+  const res = await fetch("/api/proxy", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ action:"getBookings", email: (email||"").toLowerCase() }) });
   const data = await res.json();
   return data.bookings || [];
 }
@@ -176,11 +176,11 @@ function WelcomeView({ onEnter, existingLeads }) {
   function submit() {
     const e = validate(); setErrs(e);
     if (Object.keys(e).length) return;
-    onEnter(f, false);
+    onEnter({...f, email: f.email.trim().toLowerCase()}, false);
   }
   function signIn() {
     if (!signInEmail.includes("@")) { setSignInErr("Please enter a valid email."); return; }
-    onEnter({ email: signInEmail.trim() }, true);
+    onEnter({ email: signInEmail.trim().toLowerCase() }, true);
   }
   return (
     <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#1e3a5f 0%,#1d4ed8 100%)",display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}}>
@@ -574,7 +574,7 @@ function CheckoutView({ service, date, slot, recurring, recurringDates, onConfir
     const e=validate(); setErrs(e);
     if(Object.keys(e).length) return;
     setSubmitting(true);
-    await onConfirm({name:f.name,email:f.email,phone:f.phone});
+    await onConfirm({name:f.name,email:f.email.trim().toLowerCase(),phone:f.phone});
     setSubmitting(false);
   }
   const availableRecurring = recurringDates?.filter(w=>w.available) || [];
@@ -648,7 +648,8 @@ function ConfirmView({ service, date, slot, customer, recurring, bookedDates, on
 
 // ── Client Portal ──────────────────────────────────────────────────────────
 function ClientPortalView({ bookings, lead, onBack, onBook }) {
-  const myBookings = bookings.filter(b => b.customer?.email === lead?.email);
+  const myEmail = (lead?.email || "").toLowerCase();
+  const myBookings = bookings.filter(b => (b.customer?.email || "").toLowerCase() === myEmail);
   const today = new Date(); today.setHours(0,0,0,0);
   const upcoming = myBookings.filter(b => new Date(b.date) >= today).sort((a,b) => new Date(a.date) - new Date(b.date));
   const past = myBookings.filter(b => new Date(b.date) < today).sort((a,b) => new Date(b.date) - new Date(a.date));
@@ -919,7 +920,7 @@ function DashboardView({ bookings, leads, onBack }) {
                 <div style={{display:"flex",gap:8,marginTop:6}}>
                   <span style={{background:"#eff6ff",color:"#1d4ed8",fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:20}}>{l.level}</span>
                   <span style={{background:"#f0fdf4",color:"#15803d",fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:20}}>{l.goal}</span>
-                  <span style={{background:"#f8fafc",color:"#64748b",fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:20}}>{bookings.filter(b=>b.customer?.email===l.email).length} sessions</span>
+                  <span style={{background:"#f8fafc",color:"#64748b",fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:20}}>{bookings.filter(b=>(b.customer?.email||"").toLowerCase()===(l.email||"").toLowerCase()).length} sessions</span>
                 </div>
               </div>
             ))
@@ -931,7 +932,7 @@ function DashboardView({ bookings, leads, onBack }) {
 
 // ── App ────────────────────────────────────────────────────────────────────
 export default function App() {
-  const isAdmin = window.location.search.includes("admin=true");
+  const isAdmin = window.location.search.includes("admin=courtpro2024");
   const [view, setView] = useState("welcome");
   const [lead, setLead] = useState(null);
   const [service, setService] = useState(null);
