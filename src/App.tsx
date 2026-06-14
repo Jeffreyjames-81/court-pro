@@ -47,6 +47,12 @@ function toMins(t) { const [h,m]=t.split(":").map(Number); return h*60+m; }
 function overlaps(s,e,bs,be) { return s<be && e>bs; }
 function addDays(date, days) { const d = new Date(date); d.setDate(d.getDate() + days); return d; }
 function fmtDate(d) { return d.toISOString().split("T")[0]; }
+// Parse a "YYYY-MM-DD" string as a LOCAL date (avoids UTC midnight shifting it a day back)
+function parseLocalDate(s) {
+  if (s instanceof Date) return s;
+  const [y,m,d] = String(s).split("-").map(Number);
+  return new Date(y, (m||1)-1, d||1);
+}
 
 async function fetchAvailability(dateStr) {
   const res = await fetch("/api/proxy", {
@@ -66,7 +72,7 @@ async function createCalendarEvent(service, dateStr, timeStr, customer) {
   const [h,m] = timeStr.split(":").map(Number);
   const endM = h*60+m+service.duration;
   const endStr = `${String(Math.floor(endM/60)).padStart(2,"0")}:${String(endM%60).padStart(2,"0")}`;
-  await fetch("/api/proxy", {
+  const res = await fetch("/api/proxy", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -79,6 +85,8 @@ async function createCalendarEvent(service, dateStr, timeStr, customer) {
       }
     })
   });
+  const data = await res.json();
+  return data.eventId || data.id || null;
 }
 
 async function saveLead(lead) {
@@ -647,12 +655,12 @@ function ConfirmView({ service, date, slot, customer, recurring, bookedDates, on
 }
 
 // ── Client Portal ──────────────────────────────────────────────────────────
-function ClientPortalView({ bookings, lead, onBack, onBook }) {
+function ClientPortalView({ bookings, lead, onBack, onBook, onCancel }) {
   const myEmail = (lead?.email || "").toLowerCase();
   const myBookings = bookings.filter(b => (b.customer?.email || "").toLowerCase() === myEmail);
   const today = new Date(); today.setHours(0,0,0,0);
-  const upcoming = myBookings.filter(b => new Date(b.date) >= today).sort((a,b) => new Date(a.date) - new Date(b.date));
-  const past = myBookings.filter(b => new Date(b.date) < today).sort((a,b) => new Date(b.date) - new Date(a.date));
+  const upcoming = myBookings.filter(b => parseLocalDate(b.date) >= today).sort((a,b) => parseLocalDate(a.date) - parseLocalDate(b.date));
+  const past = myBookings.filter(b => parseLocalDate(b.date) < today).sort((a,b) => parseLocalDate(b.date) - parseLocalDate(a.date));
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(null);
@@ -675,7 +683,7 @@ function ClientPortalView({ bookings, lead, onBack, onBook }) {
   }
   function hasBooking(d) {
     if (!d) return false;
-    return myBookings.some(b => new Date(b.date).toDateString() === d.toDateString());
+    return myBookings.some(b => parseLocalDate(b.date).toDateString() === d.toDateString());
   }
   function isPastDay(d) { return d && d < today; }
   function isToday(d) { return d && d.toDateString() === today.toDateString(); }
@@ -695,13 +703,31 @@ function ClientPortalView({ bookings, lead, onBack, onBook }) {
     setLoadingSlots(false);
   }
 
-  function cancelSession(booking) {
-    fetch("/api/proxy", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ action:"sendEmail", to:"jwlegacyrealty@gmail.com", subject:`Cancellation Request — ${booking.customer.name}`, body:`${booking.customer.name} wants to cancel:\n\nSession: ${booking.service.name}\nDate: ${new Date(booking.date).toLocaleDateString()}\nTime: ${booking.slot.label}\nEmail: ${booking.customer.email}` }) });
-    alert("Cancellation request sent to Jeff!");
+  const [cancelling, setCancelling] = useState(null);
+
+  async function cancelSession(booking) {
+    const when = parseLocalDate(booking.date).toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"});
+    if (!window.confirm(`Cancel your ${booking.service.name} on ${when} at ${booking.slot.label}?`)) return;
+    setCancelling(booking.date + booking.slot?.value);
+    try {
+      // 1. Delete the Google Calendar event (if we have its id)
+      if (booking.eventId) {
+        await fetch("/api/proxy", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ action:"deleteEvent", eventId: booking.eventId }) });
+      }
+      // 2. Remove the booking from Redis
+      await fetch("/api/proxy", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ action:"deleteBooking", email: (booking.customer?.email||lead?.email||"").toLowerCase(), date: booking.date, slotValue: booking.slot?.value }) });
+      // 3. Notify Jeff
+      fetch("/api/proxy", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ action:"sendEmail", to:"jwlegacyrealty@gmail.com", subject:`Session Cancelled — ${booking.customer?.name||lead?.name||""}`, body:`A session was cancelled:\n\nSession: ${booking.service.name}\nDate: ${when}\nTime: ${booking.slot.label}\nClient: ${booking.customer?.email||lead?.email||""}` }) });
+      // 4. Update the on-screen list
+      if (onCancel) onCancel(booking);
+    } catch (e) {
+      alert("Something went wrong cancelling. Please try again or contact Jeff.");
+    }
+    setCancelling(null);
   }
 
   const monthName = currentMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-  const selectedBooking = selectedDay && myBookings.find(b => new Date(b.date).toDateString() === selectedDay.toDateString());
+  const selectedBooking = selectedDay && myBookings.find(b => parseLocalDate(b.date).toDateString() === selectedDay.toDateString());
 
   return (
     <div style={{maxWidth:580,margin:"0 auto",minHeight:"100vh",background:"#f8fafc"}}>
@@ -794,7 +820,7 @@ function ClientPortalView({ bookings, lead, onBack, onBook }) {
                   <div style={{background:"#eff6ff",borderRadius:12,padding:"14px",marginBottom:12}}>
                     <div style={{fontWeight:700,color:"#1d4ed8",fontSize:14,marginBottom:4}}>{selectedBooking.service.name}</div>
                     <div style={{fontSize:13,color:"#3b82f6"}}>{selectedBooking.slot.label} · {selectedBooking.service.duration} min</div>
-                    <button onClick={()=>cancelSession(selectedBooking)} style={{marginTop:10,background:"#fef2f2",border:"1px solid #fecaca",color:"#dc2626",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>Request Cancellation</button>
+                    <button onClick={()=>cancelSession(selectedBooking)} disabled={cancelling===selectedBooking.date+selectedBooking.slot?.value} style={{marginTop:10,background:"#fef2f2",border:"1px solid #fecaca",color:"#dc2626",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>{cancelling===selectedBooking.date+selectedBooking.slot?.value?"Cancelling…":"Cancel Session"}</button>
                   </div>
                 ) : loadingSlots ? (
                   <p style={{fontSize:13,color:"#94a3b8",textAlign:"center",padding:"8px 0"}}>Checking availability…</p>
@@ -835,10 +861,10 @@ function ClientPortalView({ bookings, lead, onBack, onBook }) {
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                     <div>
                       <div style={{fontWeight:700,fontSize:15,color:"#0f172a"}}>{b.service.name}</div>
-                      <div style={{fontSize:13,color:"#64748b",marginTop:2}}>{new Date(b.date).toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}</div>
+                      <div style={{fontSize:13,color:"#64748b",marginTop:2}}>{parseLocalDate(b.date).toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}</div>
                       <div style={{fontSize:13,color:"#64748b"}}>{b.slot.label} · {b.service.duration} min</div>
                     </div>
-                    <button onClick={()=>cancelSession(b)} style={{background:"#fef2f2",border:"1px solid #fecaca",color:"#dc2626",borderRadius:10,padding:"6px 12px",fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0,marginLeft:8}}>Cancel</button>
+                    <button onClick={()=>cancelSession(b)} disabled={cancelling===b.date+b.slot?.value} style={{background:"#fef2f2",border:"1px solid #fecaca",color:"#dc2626",borderRadius:10,padding:"6px 12px",fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0,marginLeft:8}}>{cancelling===b.date+b.slot?.value?"Cancelling…":"Cancel"}</button>
                   </div>
                 </div>
               ))
@@ -849,7 +875,7 @@ function ClientPortalView({ bookings, lead, onBack, onBook }) {
                 {past.map((b,i) => (
                   <div key={i} style={{background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:16,padding:"16px",marginBottom:10,opacity:.7}}>
                     <div style={{fontWeight:600,fontSize:14,color:"#374151"}}>{b.service.name}</div>
-                    <div style={{fontSize:13,color:"#94a3b8"}}>{new Date(b.date).toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})} · {b.slot.label}</div>
+                    <div style={{fontSize:13,color:"#94a3b8"}}>{parseLocalDate(b.date).toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})} · {b.slot.label}</div>
                   </div>
                 ))}
               </>
@@ -904,7 +930,7 @@ function DashboardView({ bookings, leads, onBack }) {
                 <div style={{flex:1}}>
                   <div style={{fontWeight:700,color:"#0f172a"}}>{b.customer.name}</div>
                   <div style={{fontSize:13,color:"#64748b"}}>{b.service.name} · {b.service.duration} min</div>
-                  <div style={{fontSize:12,color:"#94a3b8"}}>{new Date(b.date).toLocaleDateString()} at {b.slot.label}</div>
+                  <div style={{fontSize:12,color:"#94a3b8"}}>{parseLocalDate(b.date).toLocaleDateString()} at {b.slot.label}</div>
                 </div>
                 <div style={{fontWeight:800,fontSize:17,color:"#1d4ed8"}}>${b.service.price}</div>
               </div>
@@ -994,15 +1020,15 @@ export default function App() {
   }
 
   async function handleCheckout(customerInfo) {
-    await createCalendarEvent(service, fmtDate(date), slot.value, customerInfo);
-    const newBooking = { service, date: fmtDate(date), slot, customer: customerInfo };
+    const eventId = await createCalendarEvent(service, fmtDate(date), slot.value, customerInfo);
+    const newBooking = { service, date: fmtDate(date), slot, customer: customerInfo, eventId };
     await saveBookingToDb(newBooking);
     const allNew = [newBooking];
 
     if (recurring && recurringDates.length > 0) {
       for (const w of recurringDates.filter(w => w.available)) {
-        await createCalendarEvent(service, w.dateStr, slot.value, customerInfo);
-        const rb = { service, date: w.dateStr, slot, customer: customerInfo };
+        const rid = await createCalendarEvent(service, w.dateStr, slot.value, customerInfo);
+        const rb = { service, date: w.dateStr, slot, customer: customerInfo, eventId: rid };
         await saveBookingToDb(rb);
         allNew.push(rb);
       }
@@ -1036,7 +1062,7 @@ export default function App() {
       {!loadingPortal && view==="datetime"      && <DateTimeView service={service} onConfirm={(d,s,r,rd)=>{setDate(d);setSlot(s);setRecurring(r);setRecurringDates(rd||[]);setView("checkout");}} onBack={()=>setView("home")}/>}
       {!loadingPortal && view==="checkout"      && <CheckoutView service={service} date={date} slot={slot} recurring={recurring} recurringDates={recurringDates} onConfirm={handleCheckout} onBack={()=>setView("datetime")} lead={lead}/>}
       {!loadingPortal && view==="confirm"       && <ConfirmView service={service} date={date} slot={slot} customer={customer} recurring={recurring} bookedDates={recurringDates?.filter(w=>w.available)} onHome={reset} onPortal={()=>setView("portal")}/>}
-      {!loadingPortal && view==="portal"        && <ClientPortalView bookings={bookings} lead={lead} onBack={()=>setView("home")} onBook={()=>setView("home")}/>}
+      {!loadingPortal && view==="portal"        && <ClientPortalView bookings={bookings} lead={lead} onBack={()=>setView("home")} onBook={()=>setView("home")} onCancel={(b)=>setBookings(prev=>prev.filter(x=>!(x.date===b.date && x.slot?.value===b.slot?.value && (x.customer?.email||"").toLowerCase()===(b.customer?.email||"").toLowerCase())))}/>}
       {!loadingPortal && view==="dashboard"     && <DashboardView bookings={bookings} leads={leads} onBack={()=>setView("home")}/>}
     </div>
   );
