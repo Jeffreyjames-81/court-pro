@@ -46,7 +46,13 @@ function generateSlots(durationMins, date) {
 function toMins(t) { const [h,m]=t.split(":").map(Number); return h*60+m; }
 function overlaps(s,e,bs,be) { return s<be && e>bs; }
 function addDays(date, days) { const d = new Date(date); d.setDate(d.getDate() + days); return d; }
-function fmtDate(d) { return d.toISOString().split("T")[0]; }
+function fmtDate(d) {
+  // Build YYYY-MM-DD from LOCAL date parts (avoids UTC shifting evening slots to next day)
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 // Parse a "YYYY-MM-DD" string as a LOCAL date (avoids UTC midnight shifting it a day back)
 function parseLocalDate(s) {
   if (s instanceof Date) return s;
@@ -444,7 +450,7 @@ function DateTimeView({ service, onConfirm, onBack }) {
   const [recurring, setRecurring] = useState(false);
   const [recurringPreview, setRecurringPreview] = useState([]);
   const [loadingRecurring, setLoadingRecurring] = useState(false);
-  const dates = Array.from({length:14},(_,i)=>{ const d=new Date(today); d.setDate(today.getDate()+i+1); return d; });
+  const dates = Array.from({length:30},(_,i)=>{ const d=new Date(today); d.setDate(today.getDate()+i+1); return d; });
 
   async function pickDate(d) {
     setSelDate(d); setSelSlot(null); setLoading(true); setErr(""); setRecurring(false); setRecurringPreview([]);
@@ -1009,13 +1015,13 @@ export default function App() {
       setLead(dbLead);
       setBookings(dbBookings);
       setLoadingPortal(false);
-      setView("portal");
+      setView("home");
     } else {
       // Sign up — save to Redis
       setLead(info);
       await saveLead(info);
       fetch("/api/proxy", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ action:"addToMailchimp", name:info.name, email:info.email, phone:info.phone, level:info.level, goal:info.goal, tags:["Tennis"] }) });
-      setView("portal");
+      setView("home");
     }
   }
 
@@ -1056,7 +1062,7 @@ export default function App() {
     <div style={{minHeight:"100vh",background:"#f8fafc",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
       {loadingPortal && <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"linear-gradient(135deg,#1e3a5f,#1d4ed8"}}><div style={{color:"#fff",textAlign:"center"}}><div style={{fontSize:48,marginBottom:16}}>🎾</div><p style={{fontSize:16,fontWeight:600}}>Loading your sessions…</p></div></div>}
       {!loadingPortal && view==="welcome"       && <WelcomeView onEnter={handleEnter} existingLeads={leads}/>}
-      {!loadingPortal && view==="home"          && <HomeView onBook={s=>{setService(s);setView("datetime");}} onClinics={handleClinicAction} onDashboard={loadDashboard} onPortal={()=>setView("portal")} lead={lead} isAdmin={isAdmin}/>}
+      {!loadingPortal && view==="home"          && <HomeView onBook={s=>{setService(s);setDate(null);setSlot(null);setRecurring(false);setRecurringDates([]);setView("datetime");}} onClinics={handleClinicAction} onDashboard={loadDashboard} onPortal={()=>setView("portal")} lead={lead} isAdmin={isAdmin}/>}
       {!loadingPortal && view==="clinicsignup"  && <ClinicSignUpView clinic={selectedClinic} onBack={()=>setView("home")} lead={lead}/>}
       {!loadingPortal && view==="requestinvite" && <RequestInviteView clinic={selectedClinic} onBack={()=>setView("home")} lead={lead}/>}
       {!loadingPortal && view==="datetime"      && <DateTimeView service={service} onConfirm={(d,s,r,rd)=>{setDate(d);setSlot(s);setRecurring(r);setRecurringDates(rd||[]);setView("checkout");}} onBack={()=>setView("home")}/>}
