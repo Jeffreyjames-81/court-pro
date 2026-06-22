@@ -450,7 +450,22 @@ function DateTimeView({ service, onConfirm, onBack }) {
   const [recurring, setRecurring] = useState(false);
   const [recurringPreview, setRecurringPreview] = useState([]);
   const [loadingRecurring, setLoadingRecurring] = useState(false);
-  const dates = Array.from({length:30},(_,i)=>{ const d=new Date(today); d.setDate(today.getDate()+i+1); return d; });
+  const todayMidnight = new Date(); todayMidnight.setHours(0,0,0,0);
+  const maxDate = new Date(todayMidnight); maxDate.setDate(maxDate.getDate()+30);
+  const [calMonth, setCalMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
+  const cy = calMonth.getFullYear();
+  const cm = calMonth.getMonth();
+  const firstWeekday = new Date(cy, cm, 1).getDay();
+  const daysInCalMonth = new Date(cy, cm+1, 0).getDate();
+  const calCells = [];
+  for (let i=0;i<firstWeekday;i++) calCells.push(null);
+  for (let i=1;i<=daysInCalMonth;i++) calCells.push(new Date(cy, cm, i));
+  function dayBookable(d) {
+    if (!d) return false;
+    const dow = d.getDay();
+    const isTeaching = (dow>=1 && dow<=6);
+    return isTeaching && d >= todayMidnight && d <= maxDate;
+  }
 
   async function pickDate(d) {
     setSelDate(d); setSelSlot(null); setLoading(true); setErr(""); setRecurring(false); setRecurringPreview([]);
@@ -491,25 +506,42 @@ function DateTimeView({ service, onConfirm, onBack }) {
       <div style={{padding:"0 20px 24px"}}>
         <h1 style={{fontSize:22,fontWeight:800,color:"#0f172a",marginBottom:4}}>Pick Date & Time</h1>
         <p style={{fontSize:13,color:"#64748b",marginBottom:20}}>{service.name} · {service.duration} min · ${service.price}</p>
-        <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:8,marginBottom:24}}>
-          {dates.map(d => {
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+          <button aria-label="Previous month" onClick={()=>setCalMonth(new Date(cy,cm-1,1))} style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:10,padding:"8px 14px",cursor:"pointer",fontSize:18,color:"#374151"}}>‹</button>
+          <span style={{fontWeight:700,fontSize:16,color:"#0f172a"}}>{calMonth.toLocaleDateString("en-US",{month:"long",year:"numeric"})}</span>
+          <button aria-label="Next month" onClick={()=>setCalMonth(new Date(cy,cm+1,1))} style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:10,padding:"8px 14px",cursor:"pointer",fontSize:18,color:"#374151"}}>›</button>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:6}}>
+          {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=>(
+            <div key={d} style={{textAlign:"center",fontSize:10,fontWeight:700,color:"#94a3b8",padding:"4px 0"}}>{d}</div>
+          ))}
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:5,marginBottom:14}}>
+          {calCells.map((d,i)=>{
+            if (!d) return <div key={`e-${i}`}/>;
+            const bookable = dayBookable(d);
             const active = selDate && fmtDate(selDate)===fmtDate(d);
-            const day = d.getDay();
-            const available = (day >= 1 && day <= 4) || day === 5 || day === 6;
+            const isToday = d.getTime()===todayMidnight.getTime();
             return (
-              <button key={fmtDate(d)} onClick={()=>available&&pickDate(d)} style={{
-                flexShrink:0,width:52,padding:"8px 0",borderRadius:14,
-                border:`2px solid ${active?"#1d4ed8":"#e2e8f0"}`,
-                background:active?"#1d4ed8":available?"#fff":"#f8fafc",
-                color:active?"#fff":available?"#374151":"#cbd5e1",
-                cursor:available?"pointer":"default",textAlign:"center"
-              }}>
-                <div style={{fontSize:10,fontWeight:600,opacity:.8}}>{d.toLocaleDateString("en-US",{weekday:"short"})}</div>
-                <div style={{fontSize:20,fontWeight:800,lineHeight:1.2}}>{d.getDate()}</div>
-                <div style={{fontSize:10,opacity:.7}}>{d.toLocaleDateString("en-US",{month:"short"})}</div>
-              </button>
+              <button key={fmtDate(d)} onClick={()=>bookable&&pickDate(d)} style={{
+                aspectRatio:"1",borderRadius:10,border:"none",
+                cursor:bookable?"pointer":"default",
+                display:"flex",alignItems:"center",justifyContent:"center",
+                fontSize:13,
+                fontWeight:active||isToday?700:bookable?500:400,
+                background:active?"#1d4ed8":bookable?"#fff":"#f1f5f9",
+                color:active?"#fff":bookable?"#374151":"#cbd5e1",
+                boxShadow:bookable&&!active?"0 1px 2px rgba(0,0,0,.06)":"none",
+                outline:isToday&&!active?"2px solid #1d4ed8":"none",
+                outlineOffset:"-2px"
+              }}>{d.getDate()}</button>
             );
           })}
+        </div>
+        <div style={{display:"flex",gap:14,marginBottom:20,fontSize:11,color:"#64748b",flexWrap:"wrap"}}>
+          <span style={{display:"flex",alignItems:"center",gap:5}}><span style={{width:13,height:13,borderRadius:4,background:"#fff",border:"1px solid #cbd5e1",display:"inline-block"}}/> Available</span>
+          <span style={{display:"flex",alignItems:"center",gap:5}}><span style={{width:13,height:13,borderRadius:4,background:"#1d4ed8",display:"inline-block"}}/> Selected</span>
+          <span style={{display:"flex",alignItems:"center",gap:5}}><span style={{width:13,height:13,borderRadius:4,background:"#f1f5f9",display:"inline-block"}}/> Unavailable</span>
         </div>
         {!selDate && <p style={{textAlign:"center",color:"#94a3b8",padding:"32px 0"}}>Select a date to see available times</p>}
         {loading && <div style={{textAlign:"center",padding:"32px 0"}}><div style={{fontSize:32,marginBottom:8}}>📅</div><p style={{color:"#94a3b8",fontSize:14}}>Checking your calendar…</p></div>}
