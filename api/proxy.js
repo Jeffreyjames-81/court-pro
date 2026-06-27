@@ -123,7 +123,7 @@ export default async function handler(req, res) {
     if (action === 'createEvent') {
       const accessToken = await getGoogleAccessToken();
       const { event } = req.body;
-      const calRes = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+      const calRes = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events?sendUpdates=all', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(event),
@@ -142,7 +142,7 @@ export default async function handler(req, res) {
       const { eventId } = req.body;
       if (!eventId) return res.status(200).json({ success: false, reason: 'no eventId' });
       const accessToken = await getGoogleAccessToken();
-      await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`, {
+      await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}?sendUpdates=all`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${accessToken}` },
       });
