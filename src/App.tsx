@@ -83,11 +83,13 @@ async function createCalendarEvent(service, dateStr, timeStr, customer) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       action: "createEvent",
+      clientEmail: customer.email,
       event: {
         summary: `Tennis – ${service.name} with ${customer.name}`,
         description: `Client: ${customer.name} | ${customer.email} | ${customer.phone} | ${service.price}`,
         start: { dateTime: `${dateStr}T${timeStr}:00`, timeZone: "America/New_York" },
         end: { dateTime: `${dateStr}T${endStr}:00`, timeZone: "America/New_York" },
+        attendees: [{ email: customer.email, displayName: customer.name }],
       }
     })
   });
@@ -646,10 +648,13 @@ function CheckoutView({ service, date, slot, recurring, recurringDates, onConfir
           </div>
         </div>
         <h2 style={{fontSize:15,fontWeight:700,color:"#0f172a",marginBottom:12}}>Your Information</h2>
-        <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:20}}>
+        <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:16}}>
           <FormField id="name" label="Full Name" placeholder="Jane Smith" value={f.name} onChange={handleChange} error={errs.name}/>
           <FormField id="email" label="Email" placeholder="jane@example.com" type="email" value={f.email} onChange={handleChange} error={errs.email}/>
           <FormField id="phone" label="Phone" placeholder="(352) 555-0100" type="tel" value={f.phone} onChange={handleChange} error={errs.phone}/>
+        </div>
+        <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:12,padding:"10px 14px",fontSize:13,color:"#1e40af",marginBottom:20,display:"flex",gap:8}}>
+          📅 <span>We'll send a calendar invite to your email so this lesson lands right on your calendar.</span>
         </div>
         <PrimaryBtn full disabled={submitting} onClick={submit}>
           {submitting ? "Booking & adding to calendar…" : "Confirm Booking"}
@@ -907,17 +912,6 @@ function ClientPortalView({ bookings, lead, onBack, onBook, onCancel }) {
                 </div>
               ))
             }
-            {past.length > 0 && (
-              <>
-                <h2 style={{fontSize:15,fontWeight:700,color:"#0f172a",marginBottom:12,marginTop:16}}>Past Sessions</h2>
-                {past.map((b,i) => (
-                  <div key={i} style={{background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:16,padding:"16px",marginBottom:10,opacity:.7}}>
-                    <div style={{fontWeight:600,fontSize:14,color:"#374151"}}>{b.service.name}</div>
-                    <div style={{fontSize:13,color:"#94a3b8"}}>{parseLocalDate(b.date).toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})} · {b.slot.label}</div>
-                  </div>
-                ))}
-              </>
-            )}
           </>
         )}
       </div>
@@ -1083,6 +1077,16 @@ export default function App() {
     setBookings(allBookings);
   }
 
+  async function openPortal() {
+    setView("portal");
+    if (lead?.email) {
+      try {
+        const fresh = await getBookingsFromDb(lead.email);
+        if (Array.isArray(fresh)) setBookings(fresh);
+      } catch {}
+    }
+  }
+
   function handleClinicAction(clinic) {
     setSelectedClinic(clinic);
     setView(clinic.inviteOnly ? "requestinvite" : "clinicsignup");
@@ -1094,12 +1098,12 @@ export default function App() {
     <div style={{minHeight:"100vh",background:"#f8fafc",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
       {loadingPortal && <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"linear-gradient(135deg,#1e3a5f,#1d4ed8"}}><div style={{color:"#fff",textAlign:"center"}}><div style={{fontSize:48,marginBottom:16}}>🎾</div><p style={{fontSize:16,fontWeight:600}}>Loading your sessions…</p></div></div>}
       {!loadingPortal && view==="welcome"       && <WelcomeView onEnter={handleEnter} existingLeads={leads}/>}
-      {!loadingPortal && view==="home"          && <HomeView onBook={s=>{setService(s);setDate(null);setSlot(null);setRecurring(false);setRecurringDates([]);setView("datetime");}} onClinics={handleClinicAction} onDashboard={loadDashboard} onPortal={()=>setView("portal")} lead={lead} isAdmin={isAdmin}/>}
+      {!loadingPortal && view==="home"          && <HomeView onBook={s=>{setService(s);setDate(null);setSlot(null);setRecurring(false);setRecurringDates([]);setView("datetime");}} onClinics={handleClinicAction} onDashboard={loadDashboard} onPortal={openPortal} lead={lead} isAdmin={isAdmin}/>}
       {!loadingPortal && view==="clinicsignup"  && <ClinicSignUpView clinic={selectedClinic} onBack={()=>setView("home")} lead={lead}/>}
       {!loadingPortal && view==="requestinvite" && <RequestInviteView clinic={selectedClinic} onBack={()=>setView("home")} lead={lead}/>}
       {!loadingPortal && view==="datetime"      && <DateTimeView service={service} onConfirm={(d,s,r,rd)=>{setDate(d);setSlot(s);setRecurring(r);setRecurringDates(rd||[]);setView("checkout");}} onBack={()=>setView("home")}/>}
       {!loadingPortal && view==="checkout"      && <CheckoutView service={service} date={date} slot={slot} recurring={recurring} recurringDates={recurringDates} onConfirm={handleCheckout} onBack={()=>setView("datetime")} lead={lead}/>}
-      {!loadingPortal && view==="confirm"       && <ConfirmView service={service} date={date} slot={slot} customer={customer} recurring={recurring} bookedDates={recurringDates?.filter(w=>w.available)} onHome={reset} onPortal={()=>setView("portal")}/>}
+      {!loadingPortal && view==="confirm"       && <ConfirmView service={service} date={date} slot={slot} customer={customer} recurring={recurring} bookedDates={recurringDates?.filter(w=>w.available)} onHome={reset} onPortal={openPortal}/>}
       {!loadingPortal && view==="portal"        && <ClientPortalView bookings={bookings} lead={lead} onBack={()=>setView("home")} onBook={()=>setView("home")} onCancel={(b)=>setBookings(prev=>prev.filter(x=>!(x.date===b.date && x.slot?.value===b.slot?.value && (x.customer?.email||"").toLowerCase()===(b.customer?.email||"").toLowerCase())))}/>}
       {!loadingPortal && view==="dashboard"     && <DashboardView bookings={bookings} leads={leads} onBack={()=>setView("home")}/>}
     </div>
