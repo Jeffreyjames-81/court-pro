@@ -16,21 +16,25 @@ const PRIVATE_SERVICES = [
 ];
 
 const CLINICS = [
-  { id: "cardio", name: "Cardio Tennis Clinic", day: "Thursdays", time: "7:00 PM", desc: "High-energy cardio tennis with music! Mixed men & women, all levels welcome. Sign up and Jeff will confirm your spot.", level: "All levels", inviteOnly: false, emoji: "🎵" },
-  { id: "mens", name: "Men's Clinic", day: "Mondays", time: "6:00 PM", desc: "Competitive men's clinic focused on match play and technique refinement.", level: "3.0+", inviteOnly: true, emoji: "🎾" },
+  { id: "cardio", name: "Cardio Tennis Clinic", day: "Thursdays", time: "7:00 PM", desc: "High-energy cardio tennis with music! Mixed men & women, all levels welcome. Sign up and Jeff will confirm your spot.", level: "All levels", inviteOnly: false, emoji: "🎵", musicUrl: "https://music.youtube.com/playlist?list=PLfYQNuGphu0OfqAzuS_Q1EVHOFUihAo-o" },
   { id: "womens", name: "Women's Clinic", day: "Thursdays", time: "6:00 PM", desc: "Women's clinic focused on strategy, consistency, and competitive development.", level: "3.0+", inviteOnly: true, emoji: "🎾" },
-  { id: "mens35", name: "Men's 3.5+ Group", day: "Saturdays", time: "7:45 – 9:00 AM", desc: "Advanced men's group for competitive players looking to sharpen their game.", level: "3.5+", inviteOnly: true, emoji: "🏆" }
+  { id: "ladies30", name: "Ladies 3.0 Clinic", day: "Tuesdays", time: "6:00 PM", desc: "Ladies 3.0 clinic focused on consistency, footwork, and match play.", level: "3.0", inviteOnly: true, emoji: "🎾" },
+  { id: "ladies35", name: "Ladies 3.5 Clinic", day: "Wednesdays", time: "6:00 PM", desc: "Ladies 3.5 clinic for competitive players sharpening strategy and shot-making.", level: "3.5", inviteOnly: true, emoji: "🎾" },
+  { id: "mens35", name: "Men's 3.5+ Group", day: "Saturdays", time: "7:45 – 9:00 AM", desc: "Advanced men's group for competitive players looking to sharpen their game.", level: "3.5+", inviteOnly: true, emoji: "🏆" },
+  { id: "league25", name: "Ladies 2.5 Day League", day: "Friday mornings", time: "Mornings", desc: "Ladies 2.5 day league — must be on the team to participate. Reach out for more information.", level: "2.5 · Team only", inviteOnly: true, dayLeague: true, emoji: "☀️" },
+  { id: "league30", name: "3.0 Day League", day: "Fridays", time: "12:00 PM", desc: "3.0 day league — must be on the team to participate. Reach out and Jeff will share more info.", level: "3.0 · Team only", inviteOnly: true, dayLeague: true, emoji: "☀️" }
 ];
 
 const LEVELS = ["Beginner", "2.5", "3.0", "3.5", "4.0+"];
 const GOALS = ["Private Lessons", "Group Clinics", "Competitive Play", "Just for Fun"];
 
 function generateSlots(durationMins, date) {
-  const day = date.getDay();
+  const day = date.getDay(); // 0=Sun 1=Mon 2=Tue 3=Wed 4=Thu 5=Fri 6=Sat
   let startHour, endHour;
-  if (day >= 1 && day <= 4) { startHour = 16; endHour = 21; }
-  else if (day === 5 || day === 6) { startHour = 8; endHour = 12; }
-  else return [];
+  if (day === 2 || day === 3) { startHour = 16; endHour = 21; }      // Tue/Wed 4-9pm
+  else if (day === 4) { startHour = 16; endHour = 18; }              // Thu 4-6pm (clinics after)
+  else if (day === 5 || day === 6) { startHour = 8; endHour = 13; }  // Fri/Sat 8am-1pm
+  else return [];                                                     // Mon/Sun closed
   const slots = [];
   for (let h = startHour; h < endHour; h++) {
     for (let m = 0; m < 60; m += 30) {
@@ -323,16 +327,25 @@ function HomeView({ onBook, onClinics, onDashboard, onPortal, lead, isAdmin }) {
                     <div style={{fontSize:13,color:"#64748b",marginTop:2}}>{c.day} · {c.time}</div>
                     <div style={{fontSize:12,color:"#94a3b8",marginTop:2}}>Level: {c.level}</div>
                   </div>
-                  {c.inviteOnly
+                  {c.dayLeague
+                    ? <span style={{background:"#fef9c3",color:"#854d0e",fontSize:11,fontWeight:700,padding:"4px 10px",borderRadius:20,whiteSpace:"nowrap"}}>Team Only</span>
+                    : c.inviteOnly
                     ? <span style={{background:"#fef3c7",color:"#92400e",fontSize:11,fontWeight:700,padding:"4px 10px",borderRadius:20,whiteSpace:"nowrap"}}>Invite Only</span>
                     : <span style={{background:"#dcfce7",color:"#15803d",fontSize:11,fontWeight:700,padding:"4px 10px",borderRadius:20,whiteSpace:"nowrap"}}>Open</span>
                   }
                 </div>
                 <p style={{fontSize:13,color:"#475569",lineHeight:1.5,margin:"0 0 12px"}}>{c.desc}</p>
-                {c.inviteOnly
+                {c.musicUrl && (
+                  <a href={c.musicUrl} target="_blank" rel="noopener noreferrer" style={{display:"inline-block",textDecoration:"none",background:"#fee2e2",color:"#b91c1c",border:"1px solid #fecaca",borderRadius:12,padding:"9px 16px",fontSize:13,fontWeight:700,marginBottom:12,marginRight:8}}>🎵 Jeffro's Jams</a>
+                )}
+                <div>
+                {c.dayLeague
+                  ? <button onClick={()=>onClinics(c)} style={{background:"#ca8a04",color:"#fff",border:"none",borderRadius:12,padding:"10px 18px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Reach Out for Info</button>
+                  : c.inviteOnly
                   ? <button onClick={()=>onClinics(c)} style={{background:"#1d4ed8",color:"#fff",border:"none",borderRadius:12,padding:"10px 18px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Request an Invite</button>
                   : <button onClick={()=>onClinics(c)} style={{background:"#16a34a",color:"#fff",border:"none",borderRadius:12,padding:"10px 18px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Sign Up →</button>
                 }
+                </div>
               </div>
             ))}
           </div>
@@ -465,7 +478,7 @@ function DateTimeView({ service, onConfirm, onBack }) {
   function dayBookable(d) {
     if (!d) return false;
     const dow = d.getDay();
-    const isTeaching = (dow>=1 && dow<=6);
+    const isTeaching = (dow>=2 && dow<=6);
     return isTeaching && d >= todayMidnight && d <= maxDate;
   }
 
@@ -722,7 +735,7 @@ function ClientPortalView({ bookings, lead, onBack, onBook, onCancel }) {
   function isTeachingDay(d) {
     if (!d) return false;
     const day = d.getDay();
-    return (day >= 1 && day <= 4) || day === 5 || day === 6;
+    return day >= 2 && day <= 6; // Tue-Sat (no Monday)
   }
   function hasBooking(d) {
     if (!d) return false;
