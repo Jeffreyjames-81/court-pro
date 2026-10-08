@@ -498,21 +498,35 @@ function DateTimeView({ service, onConfirm, onBack }) {
     setLoading(false);
   }
 
-  async function handleRecurringToggle(checked) {
-    setRecurring(checked);
-    if (!checked || !selSlot || !selDate) return;
+  // Checks the next 7 weeks for the chosen time. Runs again whenever the time or the checkbox changes,
+  // so the weekly list always matches the time that is actually selected.
+  async function loadRecurringPreview(d, sl) {
     setLoadingRecurring(true);
-    const weeks = [];
-    for (let i = 1; i <= 7; i++) {
-      const nextDate = addDays(selDate, i * 7);
-      const busy = await fetchAvailability(fmtDate(nextDate));
-      const slotStart = toMins(selSlot.value);
-      const slotEnd = slotStart + service.duration;
-      const available = !busy.some(b => overlaps(slotStart, slotEnd, toMins(b.start), toMins(b.end)));
-      weeks.push({ date: nextDate, dateStr: fmtDate(nextDate), available });
-    }
+    setRecurringPreview([]);
+    const slotStart = toMins(sl.value);
+    const slotEnd = slotStart + service.duration;
+    const weeks = await Promise.all([1,2,3,4,5,6,7].map(async i => {
+      const nextDate = addDays(d, i * 7);
+      let available = true;
+      try {
+        const busy = await fetchAvailability(fmtDate(nextDate));
+        available = !busy.some(b => overlaps(slotStart, slotEnd, toMins(b.start), toMins(b.end)));
+      } catch { available = false; }
+      return { date: nextDate, dateStr: fmtDate(nextDate), available };
+    }));
     setRecurringPreview(weeks);
     setLoadingRecurring(false);
+  }
+
+  function handleRecurringToggle(checked) {
+    setRecurring(checked);
+    if (!checked) { setRecurringPreview([]); return; }
+    if (selSlot && selDate) loadRecurringPreview(selDate, selSlot);
+  }
+
+  function pickSlot(sl) {
+    setSelSlot(sl);
+    if (recurring && selDate) loadRecurringPreview(selDate, sl);
   }
 
   return (
@@ -571,7 +585,7 @@ function DateTimeView({ service, onConfirm, onBack }) {
                   </h3>
                   <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:20}}>
                     {slots.map(s=>(
-                      <button key={s.value} onClick={()=>setSelSlot(s)} style={{
+                      <button key={s.value} onClick={()=>pickSlot(s)} style={{
                         padding:"10px 4px",borderRadius:12,fontSize:13,fontWeight:600,cursor:"pointer",
                         border:`2px solid ${selSlot?.value===s.value?"#1d4ed8":"#e2e8f0"}`,
                         background:selSlot?.value===s.value?"#1d4ed8":"#fff",
@@ -609,8 +623,8 @@ function DateTimeView({ service, onConfirm, onBack }) {
             }
           </>
         )}
-        <PrimaryBtn full disabled={!selSlot} onClick={()=>selSlot&&onConfirm(selDate, selSlot, recurring, recurringPreview)}>
-          {selSlot ? `Continue · ${selSlot.label}${recurring?" (Weekly)":""}` : "Select a time to continue"}
+        <PrimaryBtn full disabled={!selSlot || loadingRecurring} onClick={()=>selSlot&&!loadingRecurring&&onConfirm(selDate, selSlot, recurring, recurringPreview)}>
+          {loadingRecurring ? "Checking weekly availability…" : selSlot ? `Continue · ${selSlot.label}${recurring?" (Weekly)":""}` : "Select a time to continue"}
         </PrimaryBtn>
       </div>
     </div>
@@ -697,7 +711,7 @@ function ConfirmView({ service, date, slot, customer, recurring, bookedDates, on
             <span style={{color:"#64748b"}}>{k}</span><span style={{fontWeight:600,color:"#0f172a"}}>{v}</span>
           </div>
         ))}
-        {recurring && bookedDates && <div style={{marginTop:8,fontSize:12,color:"#15803d",fontWeight:600}}>🔄 {bookedDates.length} weekly sessions booked</div>}
+        {recurring && bookedDates && <div style={{marginTop:8,fontSize:12,color:"#15803d",fontWeight:600}}>🔄 {bookedDates.length + 1} weekly sessions booked</div>}
       </div>
       <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:12,padding:"10px 14px",fontSize:13,color:"#1e40af",display:"flex",gap:8,marginBottom:16,textAlign:"left"}}>
         📅 Sessions added to Jeff's Google Calendar automatically.
