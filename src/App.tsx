@@ -369,11 +369,13 @@ function ClinicSignUpView({ clinic, onBack, lead }) {
     if (f.phone.replace(/\D/g,"").length < 10) e.phone = "Enter a valid phone";
     return e;
   }
+  const isCardio = !clinic || clinic.id === "cardio";
+  const clinicLabel = isCardio ? "Cardio Clinic" : clinic.name;
   function submit() {
     const e = validate(); setErrs(e);
     if (Object.keys(e).length) return;
-    fetch("/api/proxy", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ action:"addToMailchimp", name:f.name, email:f.email, phone:f.phone, tags:["Tennis","Cardio Clinic"] }) });
-    fetch("/api/proxy", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ action:"sendEmail", to:"jwlegacyrealty@gmail.com", subject:"New Cardio Clinic Sign Up!", body:`Name: ${f.name}\nEmail: ${f.email}\nPhone: ${f.phone}` }) });
+    fetch("/api/proxy", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ action:"addToMailchimp", name:f.name, email:f.email, phone:f.phone, tags:["Tennis",clinicLabel] }) });
+    fetch("/api/proxy", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ action:"sendEmail", to:"jwlegacyrealty@gmail.com", subject:`New ${clinicLabel} Sign Up!`, body:`Clinic: ${isCardio ? "Cardio Tennis Clinic" : `${clinic.name} (${clinic.day} ${clinic.time})`}\nName: ${f.name}\nEmail: ${f.email}\nPhone: ${f.phone}` }) });
     setSubmitted(true);
   }
   if (submitted) return (
@@ -389,8 +391,8 @@ function ClinicSignUpView({ clinic, onBack, lead }) {
       <BackBtn onClick={onBack}/>
       <div style={{padding:"0 20px 32px"}}>
         <div style={{background:"#f0fdf4",borderRadius:16,padding:"14px 16px",marginBottom:20}}>
-          <div style={{fontWeight:700,fontSize:15,color:"#15803d"}}>🎵 Cardio Tennis Clinic</div>
-          <div style={{fontSize:13,color:"#16a34a"}}>Thursdays · 7:00 PM · All levels · Music!</div>
+          <div style={{fontWeight:700,fontSize:15,color:"#15803d"}}>{isCardio ? "🎵 Cardio Tennis Clinic" : `${clinic.emoji} ${clinic.name}`}</div>
+          <div style={{fontSize:13,color:"#16a34a"}}>{isCardio ? "Thursdays · 7:00 PM · All levels · Music!" : `${clinic.day} · ${clinic.time} · Level: ${clinic.level}`}</div>
         </div>
         <h1 style={{fontSize:20,fontWeight:800,color:"#0f172a",marginBottom:16}}>Sign Up</h1>
         <FormField id="name" label="Full Name" placeholder="Jane Smith" value={f.name} onChange={handleChange} error={errs.name}/>
