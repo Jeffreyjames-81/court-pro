@@ -17,6 +17,7 @@ const PRIVATE_SERVICES = [
 
 const CLINICS = [
   { id: "cardio", name: "Cardio Tennis Clinic", day: "Thursdays", time: "7:00 PM", desc: "High-energy cardio tennis with music! Mixed men & women, all levels welcome. Sign up and Jeff will confirm your spot.", level: "All levels", inviteOnly: false, emoji: "🎵", musicUrl: "https://music.youtube.com/playlist?list=PLfYQNuGphu0OfqAzuS_Q1EVHOFUihAo-o" },
+  { id: "joseopen", name: "Open 2.5-3.0 Clinic", day: "Mondays", time: "7:00 PM", desc: "Open clinic for 2.5 to 3.0 players, taught by Jose Dominquez. Questions? Call or text Jose at 602-702-7692.", level: "2.5-3.0", inviteOnly: false, emoji: "🎾" },
   { id: "womens", name: "Women's Clinic", day: "Thursdays", time: "6:00 PM", desc: "Women's clinic focused on strategy, consistency, and competitive development.", level: "3.0+", inviteOnly: true, emoji: "🎾" },
   { id: "ladies30", name: "Ladies 3.0 Clinic", day: "Tuesdays", time: "6:00 PM", desc: "Ladies 3.0 clinic focused on consistency, footwork, and match play.", level: "3.0", inviteOnly: true, emoji: "🎾" },
   { id: "ladies35", name: "Ladies 3.5 Clinic", day: "Wednesdays", time: "6:00 PM", desc: "Ladies 3.5 clinic for competitive players sharpening strategy and shot-making.", level: "3.5", inviteOnly: true, emoji: "🎾" },
