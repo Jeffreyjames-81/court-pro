@@ -466,7 +466,7 @@ function DateTimeView({ service, onConfirm, onBack }) {
   const [recurringPreview, setRecurringPreview] = useState([]);
   const [loadingRecurring, setLoadingRecurring] = useState(false);
   const todayMidnight = new Date(); todayMidnight.setHours(0,0,0,0);
-  const maxDate = new Date(todayMidnight); maxDate.setDate(maxDate.getDate()+30);
+  const maxDate = new Date(todayMidnight); maxDate.setMonth(maxDate.getMonth()+3);
   const [calMonth, setCalMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const cy = calMonth.getFullYear();
   const cm = calMonth.getMonth();
