@@ -23,7 +23,7 @@ const CLINICS = [
   { id: "ladies35", name: "Ladies 3.5 Clinic", day: "Wednesdays", time: "6:00 PM", desc: "Ladies 3.5 clinic for competitive players sharpening strategy and shot-making.", level: "3.5", inviteOnly: true, emoji: "🎾" },
   { id: "mens35", name: "Men's 3.5+ Group", day: "Saturdays", time: "7:45 – 9:00 AM", desc: "Advanced men's group for competitive players looking to sharpen their game.", level: "3.5+", inviteOnly: true, emoji: "🏆" },
   { id: "league25", name: "Ladies 2.5 Day League", day: "Friday mornings", time: "Mornings", desc: "Ladies 2.5 day league — must be on the team to participate. Reach out for more information.", level: "2.5 · Team only", inviteOnly: true, dayLeague: true, emoji: "☀️" },
-  { id: "league30", name: "3.0 Day League", day: "Fridays", time: "12:00 PM", desc: "3.0 day league — must be on the team to participate. Reach out and Jeff will share more info.", level: "3.0 · Team only", inviteOnly: true, dayLeague: true, emoji: "☀️" }
+  { id: "league30", name: "3.0 Day League", day: "Fridays", time: "9:00 AM", desc: "3.0 day league — must be on the team to participate. Reach out and Jeff will share more info.", level: "3.0 · Team only", inviteOnly: true, dayLeague: true, emoji: "☀️" }
 ];
 
 const LEVELS = ["Beginner", "2.5", "3.0", "3.5", "4.0+"];
