@@ -29,7 +29,18 @@ const CLINICS = [
 const LEVELS = ["Beginner", "2.5", "3.0", "3.5", "4.0+"];
 const GOALS = ["Private Lessons", "Group Clinics", "Competitive Play", "Just for Fun"];
 
+// Fridays come off the schedule starting the week of Nov 2, 2026
+const NO_FRIDAYS_FROM = new Date(2026, 10, 2);
+function isTeachingDate(d) {
+  if (!d) return false;
+  const dow = d.getDay();
+  if (dow < 2 || dow > 6) return false;          // Tue-Sat only
+  if (dow === 5 && d >= NO_FRIDAYS_FROM) return false; // no Fridays
+  return true;
+}
+
 function generateSlots(durationMins, date) {
+  if (!isTeachingDate(date)) return [];
   const day = date.getDay(); // 0=Sun 1=Mon 2=Tue 3=Wed 4=Thu 5=Fri 6=Sat
   let startHour, endHour;
   if (day === 2 || day === 3) { startHour = 16; endHour = 21; }      // Tue/Wed 4-9pm
@@ -480,8 +491,7 @@ function DateTimeView({ service, onConfirm, onBack }) {
   for (let i=1;i<=daysInCalMonth;i++) calCells.push(new Date(cy, cm, i));
   function dayBookable(d) {
     if (!d) return false;
-    const dow = d.getDay();
-    const isTeaching = (dow>=2 && dow<=6);
+    const isTeaching = isTeachingDate(d);
     return isTeaching && d >= todayMidnight && d <= maxDate;
   }
 
@@ -751,8 +761,7 @@ function ClientPortalView({ bookings, lead, onBack, onBook, onCancel }) {
 
   function isTeachingDay(d) {
     if (!d) return false;
-    const day = d.getDay();
-    return day >= 2 && day <= 6; // Tue-Sat (no Monday)
+    return isTeachingDate(d);
   }
   function hasBooking(d) {
     if (!d) return false;
